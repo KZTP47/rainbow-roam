@@ -395,7 +395,7 @@ export function populateSpirehaven(group,scene,blockers,height){
     [18.85,19.2,-Math.PI/2,'#bea1db',['#ad91dc','#f8c6d9']],
     [22.7,10.4,0,'#eeaf71',['#f7cc86','#c77f6f']],
     [6.05,22.5,Math.PI/2,'#a590cc',['#a891d4','#edb67a']],
-    [20.45,5.85,0,'#7fbbb8',['#afc58c','#d9a6b0']]
+    [22.85,6.45,0,'#7fbbb8',['#afc58c','#d9a6b0']]
   ]) stall(group,blockers,height,x,z,yaw,tint,fruit);
   for(const [x,z] of [[7.14,25.5],[14.85,25.65],[4.2,15.1],[21.0,16.1],[16.8,7.0],[-4.51,12.1],[-17.65,12.5],[28.4,15.9],[-7.08,20.4],[-8.35,8.25]]){
     streetLamp(group,x,z,height(x,z));

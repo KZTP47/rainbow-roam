@@ -687,15 +687,15 @@ export function createWorld(container,state,callback) {
     const structureCamera=(realm==='silvercoast'||cityCamera)&&!building;
     let fraction=1;
     if(!inFlight&&(fighting||interior||valley&&!building||structureCamera)){
-      for(let i=0;i<=9;i++){
-        const sample=.19+i*.09;
+      for(let i=0;i<=(cityCamera?17:9);i++){
+        const sample=cityCamera?.06+i*.055:.19+i*.09;
         const x=p.x+sx*horizontal*sample+sz*shoulder,z=p.z+sz*horizontal*sample-sx*shoulder;
         const cameraY=y+1.37+Math.sin(angle)*camDist*sample;
         const cottage=valley&&homes.some(([px,pz,,,,scale])=>
           Math.abs(x-px)<2.82*scale&&Math.abs(z-pz)<2.56*scale&&cameraY<terrainHeight(px,pz)+3.9*scale);
         const structure=structureCamera&&!landscape.isClear(x,z)&&cameraY<terrainHeight(x,z)+(cityCamera?7.4:6.25);
         if(cottage||structure||shipInterior&&!inHold(x,z)||homestead?.blocks?.(x,z)||fighting&&!interior&&!safeGround(x,z)){
-          fraction=Math.max(.18,sample-.13);
+          fraction=cityCamera?Math.max(.026,sample-.10):Math.max(.18,sample-.13);
           break;
         }
       }
@@ -705,7 +705,8 @@ export function createWorld(container,state,callback) {
     ideal.set(camX,shipInterior?Math.min(height,marigold.deck-.30):Math.max(height,terrainHeight(camX,camZ)+1.65),camZ);
     const lookAhead=interior?1.35:building?2.35:aspect<.85?1.75:3.25;
     const lookUp=interior||building||fighting?0:Math.max(0,-pitch)*18;
-    const lookHeight=(inFlight?-1.5:interior?1.43:building?.68:fighting?1.64:2.08)+lookUp+(cityCamera&&!inFlight?1.62:0);
+    const lookHeight=(inFlight?-1.5:interior?1.43:building?.68:fighting?1.64:2.08)+lookUp+
+      (cityCamera&&!inFlight?1.62*Math.min(1,fraction*2.4):0);
     target.set(p.x-sx*lookAhead+sz*shoulder,y+lookHeight,p.z-sz*lookAhead-sx*shoulder);
     if(opponent){
       const gap=Math.hypot(opponent.x-p.x,opponent.z-p.z);
@@ -715,6 +716,7 @@ export function createWorld(container,state,callback) {
       target.set(p.x+Math.sin(toward)*reach+sz*bias,y+lookHeight,p.z+Math.cos(toward)*reach-sx*bias);
     }
     camera.position.lerp(ideal,snap?1:1-Math.exp(-dt*11));
+    player.group.visible=!cityCamera||inFlight||Math.hypot(camera.position.x-p.x,camera.position.z-p.z)>1.7;
     camera.lookAt(target);
     camera.updateMatrixWorld();
   }
