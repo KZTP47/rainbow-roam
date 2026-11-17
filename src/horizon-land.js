@@ -13,7 +13,7 @@ import {frontierPlaces} from './frontier.js';
 import {skyIslands,skyItemIslands,skyRim,skyWalkRadius} from './sky-islands.js';
 import {buildSkyLandmark} from './sky-landmarks.js';
 import {groundGrain,plantHabitats,terrainRelief} from './habitat.js';
-import {inRiver,overBridge,riverCenter,riverLevel,riverWidth,silverrunRoadDistance,silverrunWalls} from './silverrun.js';
+import {arcanum,inRiver,overBridge,riverCenter,riverLevel,riverWidth,silverrunRoadDistance,silverrunWalls} from './silverrun.js';
 import {populateSilverrun} from './silverrun-art.js';
 import {coastBridge,coastRiverX,coastRiverY,coastRoadDistance,inCoastRiver,pierAt,piers,seaHeight,shoreZ} from './silvercoast.js';
 import {populateSilvercoast} from './silvercoast-art.js';
@@ -58,7 +58,7 @@ const skies={
   heath:['#82a7b6','#c2c6cf','#fbd8c2'],cinder:['#8ab6c5','#caadbf','#f6c59d'],
   reef:['#75bed2','#b5d9da','#f7d6bf'],verdigris:['#8aa7cf','#c7d4de','#fae1bc'],
   orchards:['#87bdd3','#c4d4bd','#ffe4a8'],
-  silvercoast:['#71bbcf','#bce2da','#ffe3ae']
+  silvercoast:['#71bbcf','#bce2da','#ffe3ae'],silverrun:['#7ebbdc','#c4dce8','#fde4b9']
 };
 const frontierHabitat={heath:'woods',cinder:'mesa',reef:'coast',verdigris:'woods',orchards:'woods'};
 const torus=new T.TorusGeometry(1,.06,8,32);
@@ -96,7 +96,8 @@ export function horizonTerrain(realm){
       const cityEdge=Math.max(silverrunWalls.west-x,x-silverrunWalls.east,silverrunWalls.north-z,z-silverrunWalls.south);
       const open= T.MathUtils.smoothstep(cityEdge,0,6);
       const downs=1.72*Math.exp(-(((x+43)/15)**2+((z-13)/21)**2));
-      const hill=1.38*Math.exp(-(((x-11)/6)**2+((z+2)/5)**2));
+      const hill=4.05*(1-T.MathUtils.smoothstep(Math.abs(x-arcanum.x),2.8,8.8))*
+        T.MathUtils.smoothstep(-z,-4,8.3)*(1-T.MathUtils.smoothstep(-z,13.4,17.6));
       const ground=trimHeight(realm,x,z,data.height+hill+open*(noise*.95+downs));
       if(bridgeDeck&&d<4.3&&overBridge(z)) return T.MathUtils.lerp(data.height,ground,T.MathUtils.smoothstep(d,3,4.3));
       return T.MathUtils.lerp(ground,riverLevel-.77,bank);

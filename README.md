@@ -2,6 +2,8 @@
 
 A cozy browser adventure where you can befriend a unicorn, grow a cottage garden, and follow the road wherever it goes.
 
+**[🌈 Play Now](https://kztp47.github.io/rainbow-roam/)**
+
 ![A teddy bear and Pearlyspark beneath a rainbow in Petalwick](docs/gameplay/petalwick.webp)
 
 ## A few places to wander

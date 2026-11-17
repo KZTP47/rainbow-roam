@@ -4,12 +4,13 @@ export const silverrun = {
 };
 
 export const silverrunPlaces = {
-  spirehaven:{name:'Spirehaven',note:'Walled city on the Silverrun',x:9,z:13,color:'#dab2c1',travel:[11,20],gate:[7.5,23.7],marker:[17,4]},
+  spirehaven:{name:'Spirehaven',note:'Walled city on the Silverrun',x:9,z:13,color:'#dab2c1',travel:[11,20],gate:[7,26.3],marker:[17,4]},
   millbrook:{name:'Millbrook',note:'Waterwheel village on the upper river',x:-10,z:-31,color:'#99c9ba',travel:[-10.5,-25],gate:[-5,-20.5],marker:[-22,-29]},
   windmereDowns:{name:'Windmere',note:'Windmills above the wheat fields',x:-38,z:20,color:'#ebca86',travel:[-38,25],gate:[-43,25],marker:[-42,14]}
 };
 
-export const silverrunWalls = {west:-21,east:34,north:-10,south:32};
+export const silverrunWalls = {west:-25,east:34,north:-16,south:32};
+export const arcanum={x:20.6,z:-10.6};
 export const silverrunBridges = [-29,14];
 export const riverWidth = 2.7;
 export const riverLevel = 1.13;
@@ -19,11 +20,12 @@ export const inRiver = (x,z) => Math.abs(x-riverCenter(z))<riverWidth && !overBr
 export const silverrunRegionAt = (x,z) => z<-18?'millbrook':x<-28?'windmereDowns':'spirehaven';
 
 export const silverrunPaths = [
-  [[11,38],[11,23],[11,18],[17,14],[17,4],[18,-5],[11,-8],[11,-12],[4,-23],[1,-29],[-29,-29],[-34,-29],[-37,-17],[-38,3],[-38,24]],
+  [[11,38],[11,23],[11,18],[17,14],[17,4],[16.4,-5],[11,-8],[11,-12],[11,-18],[4,-23],[1,-29],[-29,-29],[-34,-29],[-37,-17],[-38,3],[-38,24]],
   [[17,14],[14,16],[5,16],[2,14],[-25,14],[-31,19],[-38,20]],
   [[11,38],[31,38],[44,25],[43,-17],[39,-42],[29,-59]],
   [[11,38],[7,48],[11,59]],
-  [[17,14],[37,14],[44,18]]
+  [[17,14],[37,14],[44,18]],
+  [[17,4],[arcanum.x,3.4],[arcanum.x,-7.05]]
 ];
 
 export function silverrunRoadDistance(x,z){
@@ -42,7 +44,9 @@ export function roadDistance(paths,x,z){
 }
 
 export const silverrunLandmarks = {
-  spirehaven:[['South Gate',11,32,'hall'],['Griffin Fountain',11,12,'water'],['Arcanum Spire',11,-2,'hall'],['Old Bridge',riverCenter(14),14,'bridge']],
+  spirehaven:[['South Gate',11,32,'hall'],['Griffin Fountain',11,12,'water'],
+    ['Arcanum Spire',arcanum.x,arcanum.z,'hall'],['Grand Stair',arcanum.x,1,'hall'],['Clock Tower',26.2,9.55,'hall'],
+    ['Lantern Quay',riverCenter(8)+5,8,'water'],['Old Bridge',riverCenter(14),14,'bridge']],
   millbrook:[['Watermill',-13,-37,'hall'],['Millbrook Bridge',riverCenter(-29),-29,'bridge']],
   windmereDowns:[['Old Lady of Windmere',-43,11,'wind'],['Wheat terraces',-35,31,'tree']]
 };
