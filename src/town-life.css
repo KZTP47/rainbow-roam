@@ -1,0 +1,54 @@
+.town-heading{display:flex;align-items:center;gap:12px;padding:12px 14px;margin-bottom:13px;border-radius:13px;border:1px solid #e1d7bb;
+  color:#3c644f;background:linear-gradient(115deg,color-mix(in srgb,var(--activity,#aebe9c) 37%,#fff1d8),#fcf1e1 85%)}
+.town-heading>span{flex-shrink:0;width:48px;height:48px;display:grid;place-items:center;border-radius:14px;color:#4c644e;
+  background:color-mix(in srgb,var(--activity,#aebe9c) 62%,#faf0db)}
+.town-heading h3{margin:0;font:700 22px/1.16 Fraunces,Georgia,serif}
+.town-heading p,.activity-callout p{margin:4px 0 0;color:#6d604d;font-size:.82rem;line-height:1.32}
+.town-heading>.small-action{margin-left:auto;white-space:nowrap}
+.town-services{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.town-service{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border:1px solid #decfb0;border-radius:8px;background:#f3ebd6;color:#52664d;font-size:.76rem;font-weight:800}
+.town-service:hover{background:#e9e8cd}
+.activity-directory,.town-results,.field-notes-grid,.postcard-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px}
+.activity-tile{display:grid;justify-items:start;text-align:left;align-content:start;gap:5px;min-height:117px;padding:10px;border:1px solid #deceae;border-radius:11px;color:#365745;
+  background:linear-gradient(137deg,color-mix(in srgb,var(--activity) 27%,#fff6df),#fffaeb 76%)}
+.activity-tile:hover{border-color:#ae816a;box-shadow:0 4px 14px #72604429}
+.activity-tile>span{width:42px;height:42px;display:grid;place-items:center;border-radius:11px;color:#4c5947;background:color-mix(in srgb,var(--activity) 57%,#fff3dc)}
+.activity-tile>strong{font:700 16px/1.12 Fraunces,Georgia,serif}
+.activity-tile>small{color:#6a5f51;line-height:1.2;font-size:.72rem}
+.town-results{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}
+.town-card{display:grid;align-content:start;grid-template-columns:minmax(0,1fr);gap:7px;padding:10px;border-radius:11px;border:1px solid #eadbbd;background:#fffaee}
+.town-card>div{min-width:0}
+.town-card>footer,.postcard-grid footer{display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.town-card h3,.postcard-grid h3{font:700 17px/1.16 Fraunces,Georgia,serif;margin:0;color:#3e624e}
+.town-card p,.town-note{font-size:.79rem;color:#675c4d;margin:4px 0;line-height:1.35}
+.town-page>.town-note{padding:7px 9px;margin:0 0 9px;border-radius:8px;background:#eee9d5}
+.town-card>.art-tile{width:46px;height:46px;border-radius:9px}
+.activity-stock{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0}
+.activity-stock>span{display:inline-flex;align-items:center;gap:3px;padding:2px 4px;border-radius:5px;background:#f5eddb;color:#536c50;font-size:.67rem}
+.activity-stock>span.short{background:#f6e5de;color:#965648}
+.activity-stock .item-art{width:17px;height:17px;border-radius:3px}
+.town-reward{display:inline-flex;align-items:center;gap:4px;margin:3px 0;font-size:.74rem;font-weight:800;color:#83582a}
+.passport-stops{list-style:none;margin:6px 0;padding:0;display:grid;gap:5px;color:#695c51;font-size:.77rem}
+.passport-stops li{display:flex;align-items:center;gap:6px;padding:3px 5px}
+.passport-stops .next-stop{background:#f2e1bf;border-radius:6px;color:#77543a}
+.passport-stops .stamped{color:#4a7251}
+.activity-callout{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin-bottom:8px;padding:10px;border:1px solid #e2d8b9;border-radius:10px;background:#f5ecd5;color:#50664e}
+.activity-callout .field-art{width:44px;height:44px;border-radius:8px}
+.field-notes-grid article,.postcard-grid article{display:grid;justify-items:start;gap:4px;padding:8px;border:1px solid #e7d9bb;border-radius:10px;background:#fffbee;color:#4a6452}
+.field-notes-grid .field-art{width:53px;height:53px;border-radius:8px}
+.field-notes-grid article small{font-size:.73rem;color:#746650}
+.postcard-grid img{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:7px}
+@media(max-width:640px){
+  .town-heading{padding:8px;gap:7px}
+  .town-heading h3{font-size:17px}
+  .town-heading>span{width:33px;height:33px}
+  .town-heading>span svg{width:21px;height:21px}
+  .town-heading>.small-action{padding:4px;font-size:.66rem}
+  .town-heading>.small-action svg{display:none}
+  .activity-directory,.town-results,.field-notes-grid,.postcard-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .activity-tile,.town-card{padding:7px}
+  .activity-callout{grid-template-columns:auto 1fr}
+  .activity-callout>.small-action{grid-column:2;justify-self:start}
+}
+
+.town-service small{color:#74674f;font-size:.62rem;font-weight:700;margin-left:2px}

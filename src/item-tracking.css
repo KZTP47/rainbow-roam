@@ -1,0 +1,30 @@
+.item-track-button{display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:27px;padding:3px 7px;border:1px solid #d8c3e0;border-radius:7px;background:#f5eaf7;color:#60476a;font:800 .71rem Nunito,sans-serif;line-height:1;white-space:nowrap;vertical-align:middle}
+.item-track-button svg{width:13px;height:13px;flex:none}
+.item-track-button:hover,.item-track-button:focus-visible{background:#e9d9f1;border-color:#87619a;color:#4d3758}
+.item-inline-actions,.item-market-actions,.item-recipe-actions{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+ .item-market-actions,.item-recipe-actions{margin-top:auto;align-self:stretch}
+.item-recipe-actions{justify-content:space-between}
+.cost .ingredient-entry{display:inline-flex;align-items:center;gap:4px}
+.cost .ingredient-entry .item-track-button span{padding:0;background:none;font:inherit;color:inherit}
+.story-bottom{flex-wrap:wrap}
+.item-story-reward{display:inline-flex;align-items:center;gap:3px}
+.property-stock-pair{display:grid;align-content:start;gap:4px;min-width:0}
+.property-stock-pair>.item-track-button{justify-self:center}
+.item-find-label{display:grid;gap:5px;font-size:.8rem;font-weight:800;color:#3e5b48;margin:9px 0 11px}
+.item-find-label input{width:100%;border:1px solid #d7c3a5;border-radius:8px;padding:8px 11px;background:#fff9ea;color:#3e4d3d;font:inherit}
+.item-find-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr));gap:7px}
+.item-find-grid article{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:4px 6px;padding:7px;border:1px solid #e7d8ba;background:#fffaf0;border-radius:10px;color:#405646}
+.item-find-grid article strong{font:650 .86rem Fraunces,serif}
+.item-find-grid article .item-track-button{grid-column:2;justify-self:start}
+#item-trail-status{position:absolute;top:clamp(76px,10vh,99px);right:clamp(12px,2.7vw,42px);display:flex;align-items:flex-start;gap:7px;pointer-events:auto;max-width:min(270px,38vw);padding:8px 8px 8px 9px;background:#fff8ecef;border:1px solid #d9c6da;border-radius:12px;color:#594567;box-shadow:0 3px 12px #33283e29;line-height:1.2}
+#item-trail-status strong,#item-trail-status small{display:block}
+#item-trail-status small{font-size:.7rem;margin-top:3px;color:#554b5b}
+#item-trail-status div .item-track-button{margin-top:4px}
+#item-trail-status .trail-icon{flex:none;background:#eadbf2;border-radius:7px;padding:4px;display:grid;place-items:center;color:#795e88}
+.trail-bearing svg{transform:rotate(var(--trail-turn,0rad))}
+.item-track-stop{color:inherit;display:grid;place-items:center;background:transparent;border:0;border-radius:5px;padding:3px;margin:-2px -3px 0 auto}
+.item-track-stop:hover,.item-track-stop:focus-visible{background:#e9d9f1}
+#item-trail-status[data-phase="turn-in"]{background:#eff4e8ef;border-color:#bcd2af;color:#355742}
+#item-trail-status[data-phase="turn-in"] .trail-icon{background:#d6e7ce;color:#476650}
+.menu-open #item-trail-status{visibility:hidden}
+@media(max-width:560px){#item-trail-status{max-width:45vw;font-size:.81rem;right:10px} #item-trail-status .trail-icon{padding:2px}#item-trail-status .trail-icon svg{width:15px;height:15px}}

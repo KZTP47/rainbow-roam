@@ -1,0 +1,101 @@
+.folio-overlay{align-items:stretch;background:linear-gradient(90deg,transparent 22%,#27362b44)!important}
+.folio-drawer{--paper:#fff8eb;--line:#e9d9b8;--forest:#385b4b;--caption:#6a604e;width:min(750px,65vw);background:var(--paper)}
+.folio-drawer .panel-body{padding:clamp(11px,2vw,23px)}
+.folio-drawer .folio-tabs{margin:15px 0 12px}
+.folio-feature{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:13px;
+  min-height:86px;padding:12px 14px;margin:0 0 14px;border:1px solid var(--line);border-radius:14px;
+  color:var(--forest);background:linear-gradient(112deg,#ecedda,#fdf2da 82%)}
+.folio-feature strong,.folio-feature h3{font:700 clamp(17px,2vw,22px)/1.15 Fraunces,Georgia,serif;margin:0;color:inherit}
+.folio-feature p{margin:6px 0 0;color:var(--caption);font-size:.82rem;line-height:1.36}
+.folio-feature progress{display:block;width:min(148px,100%);height:7px;margin-top:6px;accent-color:#76926d}
+.chapter-illustration{display:grid;place-items:center;width:63px;height:63px;border-radius:45% 50% 42% 51%;
+  color:#4d6b53;background:color-mix(in srgb,var(--chapter,#a7b98e) 52%,#fff5df);box-shadow:inset 0 0 0 1px #fff8e2}
+.journal-cover{background:linear-gradient(105deg,color-mix(in srgb,var(--chapter) 38%,#f9f1de),#fbf2df 82%)}
+.field-guide-feature{background:linear-gradient(108deg,#e7e8d6,#fbecd9 82%)}
+.field-guide-feature .feature-specimen{width:68px;height:68px;border-radius:14px}
+.workbench-feature{background:linear-gradient(115deg,#f1e1ca,#faeddb)}
+.feature-art{width:92px;height:67px;position:relative}
+.feature-art .item-art{position:absolute;width:44px;height:44px;border:1px solid #fff5de;border-radius:10px;box-shadow:0 2px 6px #73554233}
+.feature-art .item-art:nth-child(1){top:6px;left:2px;rotate:-12deg}
+.feature-art .item-art:nth-child(2){top:2px;left:40px;rotate:10deg}
+.feature-art .item-art:nth-child(3){top:25px;left:25px;rotate:3deg}
+.folio-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(164px,1fr));gap:10px}
+.folio-empty{grid-column:1/-1;margin:2px 0;padding:14px;border:1px dashed #e6d6b5;border-radius:11px;color:var(--caption);font-size:.85rem}
+.folio-recipe.recipe,.market-goods,.wanted-poster,.folio-friend.companion-card,.folio-story.journal-entry{
+  background:#fffaee;border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-width:0;
+  margin:0;padding:10px;align-items:flex-start;gap:7px;min-height:0;
+}
+.folio-recipe.recipe>.item-art,.market-goods>.item-art{width:67px;height:67px;border-radius:12px;align-self:center}
+.folio-recipe .recipe-name,.market-goods>strong{width:100%;text-align:left;color:var(--forest)}
+.folio-recipe .recipe-name strong,.market-goods strong{font:700 16px/1.15 Fraunces,Georgia,serif}
+.folio-recipe .cost{display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 0}
+.folio-recipe>.small-action,.market-goods>.small-action,.wanted-poster>.small-action{align-self:stretch;justify-content:center;margin-top:auto}
+.market-cover .item-art{width:61px;height:61px;border-radius:12px}
+.market-cover .purse,.bounty-cover .purse{margin:0;justify-content:end}
+.market-goods small{color:var(--caption);font-size:.75rem}
+.folio-story.journal-entry{min-height:120px;background:linear-gradient(176deg,#fffbef,color-mix(in srgb,var(--chapter) 8%,#fff8eb))}
+.folio-story strong{font:700 17px/1.14 Fraunces,Georgia,serif;color:var(--forest)}
+.folio-story p{font-size:.79rem;line-height:1.28;margin:4px 0}
+.story-mark{min-height:25px;display:flex;gap:6px;align-items:center;padding:2px 7px;border-radius:6px;
+  color:#3e654e;background:color-mix(in srgb,var(--chapter) 33%,#fff4d8);font-size:.69rem;font-weight:800}
+.story-mark svg{flex-shrink:0}
+.story-bottom{display:flex;justify-content:space-between;align-items:center;gap:5px;width:100%;margin-top:auto}
+.story-bottom .item-art{width:34px;height:34px;border-radius:7px;display:block}
+.story-bottom .track{display:inline-flex;align-items:center;gap:4px;padding:4px 7px;height:auto;width:auto}
+.story-bottom .track span{font-size:.71rem}
+.friend-plate{position:relative;display:grid;place-items:center;width:100%;padding:5px;background:color-mix(in srgb,var(--fur) 35%,#faf0e0);border-radius:10px}
+.friend-plate .specimen{width:76px;height:76px;border-radius:10px;background-color:transparent}
+.friend-attached{position:absolute;right:6px;bottom:6px;display:grid;place-items:center;color:#773a62;background:#fff2de;border-radius:50%;width:24px;height:24px}
+.folio-friend strong{font:700 17px/1.12 Fraunces,Georgia,serif;color:var(--forest)}
+.folio-friend small{display:block;color:var(--caption);margin-top:3px;font-size:.72rem}
+.folio-friend .friend-description p{font-size:.75rem;line-height:1.3;margin:6px 0}
+.folio-friend .offering{display:flex;align-items:center;gap:4px}
+.folio-friend .ingredient-art{flex-shrink:0}
+.voyage-cards{grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:9px}
+.voyage-cards button{display:grid;grid-template-columns:42px 1fr auto;align-items:start;padding:11px;
+  background:linear-gradient(130deg,color-mix(in srgb,var(--realm) 33%,#fff5dc),#fffaef 59%);min-height:80px}
+.voyage-cards button small{line-height:1.25}
+.bounty-cover{background:linear-gradient(112deg,#f9e6d0,#fcf1dd)}
+.bounty-cover .chapter-illustration{background:#f2d4be;color:#8d5048}
+.wanted-art{display:block;background-image:var(--wanted-pictures);background-size:var(--art-c) var(--art-r);
+  background-position:var(--art-x) var(--art-y);background-repeat:no-repeat}
+.bounty-controls{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:10px 0}
+.bounty-controls .tab-row{margin:0}
+.bounty-region{display:flex;align-items:center;gap:5px;color:var(--caption);font-weight:800;font-size:.74rem}
+.bounty-controls select{max-width:165px;padding:5px;border:1px solid #dfceb0;border-radius:7px;background:#fff9eb;color:var(--forest);font:inherit}
+.wanted-poster{position:relative;background:linear-gradient(180deg,#f8e8d6,#fff6e3)}
+.poster-picture{position:relative;display:grid;place-items:center;width:100%;padding:5px;background:color-mix(in srgb,var(--coat) 23%,#f6e0c8);
+  border:1px solid #e9d4b6;border-radius:8px}
+.poster-picture[aria-pressed="true"]{outline:2px solid #a57569}
+.poster-picture .wanted-art{width:78px;height:78px;border-radius:6px}
+.poster-style{position:absolute;right:3px;bottom:3px;padding:2px 4px;border-radius:5px;background:#fff4df;color:#775048;
+  display:flex;align-items:center;gap:3px;font-size:.65rem;font-weight:800}
+.poster-copy strong,.bounty-dossier h3{font:700 17px/1.12 Fraunces,Georgia,serif;color:#693e43}
+.poster-copy small,.bounty-dossier small{display:block;margin:3px 0;color:var(--caption);font-size:.71rem}
+.bounty-prize{display:flex;align-items:center;gap:4px;font-size:.74rem;color:#7d5f3c;font-weight:800}
+.bounty-prize svg:nth-of-type(2){margin-left:7px;color:#805c8c}
+.sr-money{position:absolute;clip-path:inset(50%);width:1px;height:1px;overflow:hidden}
+.bounty-dossier{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px;border:1px solid #e3c5ab;
+  border-radius:11px;background:#fff0dc}
+.bounty-dossier .wanted-art{width:69px;height:69px;border-radius:8px}
+.bounty-dossier h3{margin:0}
+.bounty-dossier p{margin:4px 0;font-size:.82rem;color:#644e44}
+.controls-fold{margin:14px 0;border:1px solid #e7d5ad;border-radius:9px;padding:8px 10px;font-size:.81rem;color:#52634e}
+.controls-fold summary{cursor:pointer;font-weight:800}
+@media(max-width:900px){.folio-drawer{width:min(680px,82vw)}}
+@media(max-width:600px){
+  .folio-drawer{width:100%}
+  .folio-drawer .panel-body{padding:10px}
+  .folio-feature{padding:9px;gap:8px;min-height:64px;grid-template-columns:auto minmax(0,1fr)}
+  .folio-feature>.small-action,.folio-feature>.purse{grid-column:2;justify-content:start;justify-self:start}
+  .folio-feature p{font-size:.76rem}
+  .chapter-illustration,.field-guide-feature .feature-specimen,.market-cover .item-art{width:50px;height:50px}
+  .feature-art{width:64px;height:49px;scale:.76;transform-origin:top left}
+  .folio-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .folio-recipe.recipe,.market-goods,.wanted-poster,.folio-friend.companion-card,.folio-story.journal-entry{padding:8px}
+  .bounty-dossier{grid-template-columns:auto 1fr}
+  .bounty-dossier>.small-action{grid-column:2;justify-self:start}
+}
+
+.folio-friend .companion-actions{flex-wrap:wrap;gap:4px}
+.folio-friend .companion-actions .small-action{white-space:nowrap;padding:4px 6px}
