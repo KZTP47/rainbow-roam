@@ -1,11 +1,11 @@
 import * as T from 'three';
 import {part} from './models.js';
 import {celMaterial} from './cel.js';
-import {riverCenter,riverLevel,riverWidth,silverrunBridges,silverrunWalls} from './silverrun.js';
+import {riverCenter,riverLevel,riverWidth,silverrunBridges} from './silverrun.js';
+import {populateSpirehaven} from './spirehaven-art.js';
 
 const cream='#f3dbb9', stone='#d1b6b6', trim='#ad869d', wood='#946761', gold='#efbc6a';
 const windowGlass=celMaterial('#ffe3a0',{emissive:'#f3b975',emissiveIntensity:.23});
-const shallows=celMaterial('#87cbc8',{emissive:'#569a9d',emissiveIntensity:.31});
 
 export function house(group,blockers,height,x,z,yaw,roof,wall,width=4.9,stories=1){
   const g=new T.Group(),depth=4.2,h=2.7*stories;
@@ -43,123 +43,6 @@ export function house(group,blockers,height,x,z,yaw,roof,wall,width=4.9,stories=
   part(g,'cube',cream,width*.3,h+2.08,-.92,.64,.16,.66);
   blockers.push([x,z,Math.abs(Math.cos(yaw))*width/2+Math.abs(Math.sin(yaw))*depth/2+.25,
     Math.abs(Math.sin(yaw))*width/2+Math.abs(Math.cos(yaw))*depth/2+.25]);
-}
-
-function tower(group,blockers,height,x,z,r,h,roof){
-  const y=height(x,z);
-  part(group,'cyl',stone,x,y+h*.5-.22,z,r,h+.45,r);
-  part(group,'cyl',cream,x,y+h-.25,z,r*1.11,.36,r*1.11);
-  part(group,'cone',roof,x,y+h+r*.94,z,r*1.13,r*1.94,r*1.13);
-  part(group,'diamond',gold,x,y+h+r*1.95,z,r*.16,r*.34,r*.16);
-  for(const angle of [0,Math.PI/2,Math.PI,Math.PI*1.5]){
-    const px=x+Math.sin(angle)*r,pz=z+Math.cos(angle)*r;
-    part(group,'cube',trim,px,y+h*.72,pz,.54,.98,.14,0,angle);
-    part(group,'cube',windowGlass,px+Math.sin(angle)*.10,y+h*.72,pz+Math.cos(angle)*.10,.28,.74,.09,0,angle);
-  }
-  blockers.push([x,z,r+.22]);
-}
-
-function lineWall(group,blockers,height,ax,az,bx,bz){
-  const length=Math.hypot(bx-ax,bz-az),x=(ax+bx)/2,z=(az+bz)/2,y=height(x,z);
-  const horizontal=az===bz,yaw=horizontal?0:Math.PI*.5;
-  part(group,'cube',stone,x,y+1.48,z,length,3.56,1.12,0,yaw);
-  part(group,'cube',cream,x,y+3.19,z,length,.21,1.33,0,yaw);
-  for(let d=.55;d<length-.14;d+=1.37){
-    part(group,'cube',trim,ax+(bx-ax)*d/length,y+3.53,az+(bz-az)*d/length,.61,.62,1.05,0,yaw);
-  }
-  blockers.push([x,z,horizontal?length*.5:.75,horizontal?.75:length*.5]);
-}
-
-function gate(group,blockers,height,x,z,yaw=0,half=2.55){
-  const y=height(x,z)+1.24;
-  part(group,'cube',cream,x,y+2.29,z,half*2,1.15,1.35,0,yaw);
-  part(group,'cube',trim,x,y+2.91,z,half*2+.28,.22,1.56,0,yaw);
-  for(const side of [-1,1]){
-    const tx=x+side*half*Math.cos(yaw),tz=z+side*half*Math.sin(yaw);
-    tower(group,blockers,height,tx,tz,1.01,4.18,'#9592c1');
-  }
-  part(group,'diamond',gold,x,y+2.32,z,.44,.54,.75,0,yaw);
-}
-
-function stand(group,blockers,height,x,z,color){
-  const y=height(x,z);
-  for(const dx of [-1.27,1.27]) for(const dz of [-.72,.72])
-    part(group,'cube',wood,x+dx,y+1.2,z+dz,.105,2.45,.105);
-  for(let stripe=0;stripe<8;stripe++){
-    const px=x+(stripe-3.5)*.34;
-    part(group,'cube',stripe%2?cream:color,px,y+2.35,z,.35,.13,1.94,-.21);
-    part(group,'sphere',stripe%2?cream:color,px,y+2.15,z+.94,.181,.20,.081);
-  }
-  part(group,'cube',wood,x,y+.7,z+.20,2.6,1.4,.80);
-  part(group,'cube',cream,x,y+1.33,z+.2,2.72,.17,.88);
-  for(let n=0;n<7;n++) part(group,'low',n%2?'#d88c83':'#e8be70',x+(n-3)*.30,y+1.5,z+.23,.19,.14,.17);
-  blockers.push([x,z,1.46,.95]);
-}
-
-function city(group,blockers,height){
-  const {west,east,north,south}=silverrunWalls;
-  for(const z of [north,south]){
-    const channel=riverCenter(z);
-    lineWall(group,blockers,height,west,z,channel-3.9,z);
-    lineWall(group,blockers,height,channel+3.9,z,8.4,z);
-    lineWall(group,blockers,height,13.6,z,east,z);
-    gate(group,blockers,height,11,z);
-    // The river is open below these low water gates.
-    part(group,'cube',stone,channel,riverLevel+2.74,z,7.8,1.2,1.27);
-    part(group,'cube',cream,channel,riverLevel+3.38,z,7.95,.23,1.41);
-  }
-  for(const x of [west,east]){
-    lineWall(group,blockers,height,x,north,x,11.4);
-    lineWall(group,blockers,height,x,16.6,x,south);
-    gate(group,blockers,height,x,14,Math.PI*.5);
-    for(const z of [north,south]) tower(group,blockers,height,x,z,1.88,4.75,'#9299bd');
-  }
-  const roofs=['#ae869f','#739eaa','#bd858b','#928ab7'];
-  const walls=['#f8ddb5','#f0c4b7','#eed5cd','#e1dec3'];
-  const houses=[[3,22,0],[1,5,0],[2,-3,0],[23,-4,0],[29,-3,0],
-    [24,5,0],[30,5,0],[23,22,Math.PI],[29,23,Math.PI],[1,28,Math.PI],[-18,3,Math.PI*.5],[-18,24,Math.PI*.5]];
-  houses.forEach(([x,z,yaw],i)=>house(group,blockers,height,x,z,yaw,roofs[i%4],walls[i%4],i%4===1?4.6:4.9,i%3===0?1:2));
-  for(const [x,z,yaw] of [[-2,-1,Math.PI*.5],[-4,6,Math.PI*.5],[-2,23,Math.PI*.5]])
-    house(group,blockers,height,x,z,yaw,'#a586b1',cream,3.65);
-  const y=height(11,12);
-  for(let j=0;j<19;j++) for(let i=0;i<27;i++){
-    const x=1.95+i*.82+(j%2)*.39,z=6.9+j*.74;
-    const shade=['#ddc6b1','#e5cdb5','#e4c9bd','#e9d3bb'][(i*13+j*7+i*j)%4];
-    const brick=part(group,'cube',shade,x,height(x,z)-.032,z,.801,.095,.723);
-    brick.castShadow=false;
-  }
-  part(group,'cyl',cream,11,y+.18,12,2.59,.38,2.59);
-  part(group,'cyl',stone,11,y+.41,12,2.32,.34,2.32);
-  part(group,'cyl',shallows,11,y+.59,12,2.04,.07,2.04);
-  part(group,'cyl',cream,11,y+.96,12,.46,.78,.46);
-  part(group,'soft',gold,11,y+1.42,12,.44,.39,.72);
-  part(group,'soft',gold,11,y+1.93,12+.34,.31,.40,.28);
-  part(group,'cone','#fff0b6',11,y+1.98,12+.67,.15,.40,.15,Math.PI*.5);
-  for(const side of [-1,1]){
-    part(group,'soft','#e2ab6e',11+side*.58,y+1.86,11.96,.22,.75,.4,0,0,side*-.72);
-    for(let j=0;j<4;j++) part(group,'sphere','#cef1e1',11+side*(.60+j*.13),y+1.10-j*.13,12,.072,.07,.072);
-  }
-  blockers.push([11,12,2.68]);
-  for(const [x,z,color] of [[6,10,'#a3bfa4'],[6,17,'#e3a0a9'],[18,19,'#b39ac9'],[24,12,'#e5b17f']])
-    stand(group,blockers,height,x,z,color);
-  for(const [x,z] of [[7.3,25.4],[14.6,25.4],[4,15],[21,16],[16.7,7],[-4,13],[-17,12],[27,14]]){
-    const y=height(x,z);
-    part(group,'cyl',trim,x,y+1.32,z,.095,2.64,.095);
-    part(group,'cube',gold,x,y+2.57,z,.39,.14,.39);
-    part(group,'cube',windowGlass,x,y+2.79,z,.30,.36,.30);
-    part(group,'cone',trim,x,y+3.06,z,.30,.24,.30);
-  }
-
-  const sy=height(11,-2);
-  part(group,'cyl',cream,11,sy+.3,-2,3.28,.71,3.28);
-  tower(group,blockers,height,11,-2,2.34,9.7,'#9383bd');
-  for(const side of [-1,1]) tower(group,blockers,height,11+side*2.95,-2,1.23,6,'#aaa1cc');
-  part(group,'cube','#9e7898',11,sy+1.2,.38,1.36,2.35,.22);
-  part(group,'diamond',gold,11,sy+2.92,.55,.46,.58,.16);
-  for(const side of [-1,1]){
-    part(group,'cube','#c78ba8',11+side*1.55,sy+6.5,-.10,.72,2.6,.095);
-    part(group,'diamond','#fff0c3',11+side*1.55,sy+6.72,-.041,.23,.39,.08);
-  }
 }
 
 function river(scene,group,height,waterMaterial){
@@ -239,6 +122,7 @@ function mills(group,scene,blockers,height){
 
 export function populateSilverrun(group,scene,height,blockers,waterMaterial){
   river(scene,group,height,waterMaterial);
-  city(group,blockers,height);
-  return mills(group,scene,blockers,height);
+  const city=populateSpirehaven(group,scene,blockers,height);
+  const turnMills=mills(group,scene,blockers,height);
+  return time=>{city(time);turnMills(time);};
 }

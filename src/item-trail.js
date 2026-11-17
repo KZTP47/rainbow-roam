@@ -58,6 +58,25 @@ export function trailPath(start,target,walk){
   return waypoints;
 }
 
+export function connectTrail(start,path,walk){
+  let nearest=null,segment=0,best=Infinity;
+  for(let i=1;i<path.length;i++){
+    const a=path[i-1],b=path[i],dx=b.x-a.x,dz=b.z-a.z,length=dx*dx+dz*dz;
+    if(!length) continue;
+    const t=T.MathUtils.clamp(((start.x-a.x)*dx+(start.z-a.z)*dz)/length,0,1);
+    const point={x:a.x+t*dx,z:a.z+t*dz};
+    const gap=separation(start,point);
+    if(gap<=best&&clearSegment(start,point,walk)){
+      nearest=point;segment=i;best=gap;
+    }
+  }
+  if(!nearest) return [];
+  const ahead=path.slice(segment);
+  if(separation(start,ahead[0])<.06) return [start,...ahead.slice(1)];
+  if(clearSegment(start,ahead[0],walk)) return [start,...ahead];
+  return clearSegment(nearest,ahead[0],walk)?[start,nearest,...ahead]:[];
+}
+
 export function createItemTrail(scene){
   const capacity=72;
   const geometry=new T.BufferGeometry();
@@ -107,19 +126,18 @@ export function createItemTrail(scene){
 
   return {
     tick(time){material.uniforms.time.value=reduced?0:time;},
-    draw(path,height,walk){
+    draw(path,height){
       ribbon.visible=points.visible=path.length>1;
       if(!points.visible) return;
-      let count=0,face=0,carry=.31,passed=0,lastEdge=null;
+      let count=0,face=0,carry=0,passed=0,lastEdge=null;
       for(let i=1;i<path.length&&count<capacity;i++){
         const a=path[i-1],b=path[i],length=separation(a,b);
+        if(length<.001) continue;
         for(;carry<=length&&count<capacity;carry+=.59){
           const t=carry/length,dx=(b.z-a.z)/length,dz=(a.x-b.x)/length;
-          let x=T.MathUtils.lerp(a.x,b.x,t),z=T.MathUtils.lerp(a.z,b.z,t);
+          const x=T.MathUtils.lerp(a.x,b.x,t),z=T.MathUtils.lerp(a.z,b.z,t);
           const distance=passed+carry;
-          const flare=1.08*Math.max(0,1-distance/4.3);
-          if(flare&&walk(x+dx*flare,z+dz*flare)){x+=dx*flare;z+=dz*flare;}
-          const shift=Math.sin(distance*3.4)*.45;
+          const shift=Math.sin(distance*3.4)*.33*T.MathUtils.smoothstep(distance,.35,2);
           const y=height(x,z,passed+carry)+.35;
           coords.set([x+dx*shift,y+.28+Math.cos(count*1.6)*.17,z+dz*shift],count*3);
           const edge=[[x+dx*.075,y,z+dz*.075],[x-dx*.075,y,z-dz*.075]];

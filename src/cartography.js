@@ -60,7 +60,7 @@ export const localPlaces=(realm)=>realm==='valley'
 
 export function localFrame(realm,id){
   const place=regions[id];
-  if(realm==='silverrun'&&id==='spirehaven') return {x:6,z:11,rx:32,rz:26};
+  if(realm==='silverrun'&&id==='spirehaven') return {x:6,z:8,rx:34,rz:29};
   if(realm==='silvercoast'&&id) return id==='saltwick'?{x:-30,z:13,rx:29,rz:29}:{x:30,z:21,rx:26,rz:32};
   if(place) return {x:place.x,z:place.z,rx:realm==='sky'?21.5:realm==='hogwarts'?52:townsByPlace[id]?24:21,
     rz:realm==='sky'?20:realm==='hogwarts'?53:townsByPlace[id]?22:18};

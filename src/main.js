@@ -635,6 +635,9 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('keyup',e=>world?.setKey(e.key.toLowerCase(),false));
 window.addEventListener('blur',()=>world?.clearKeys());
+window.addEventListener('contextmenu',event=>{
+  if(active) event.preventDefault();
+},{capture:true});
 onGameWindowClose(()=>{if(active)persist(false);});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&active)persist(false);});
 setInterval(()=>{if(active)persist();},3400);

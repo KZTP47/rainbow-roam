@@ -18,12 +18,12 @@ import {nearbyLoot,pickUpLoot} from './loot.js';
 import {createLootArt} from './loot-art.js';
 import {findItemTarget,trackingDistance} from './item-tracking.js';
 import {findQuestTarget,trackingSelection} from './quest-tracking.js';
-import {createItemTrail,trailPath} from './item-trail.js';
+import {connectTrail,createItemTrail,trailPath} from './item-trail.js';
 import {townServiceAt,townWater} from './town-data.js';
 import {populateTown} from './towns.js';
 import {icon} from './icons.js';
 import {items,species,wildlife,villagers,resourceSpots,regionAt} from './content.js';
-import {inRiver,riverLevel} from './silverrun.js';
+import {inRiver,riverLevel,silverrunWalls} from './silverrun.js';
 import {coastRiverY,inCoastRiver,pierAt,seaHeight} from './silvercoast.js';
 import {atStairs,canMoveOnShip,inHold,marigold,onMarigold,onShip,switchDeck} from './marigold.js';
 
@@ -103,7 +103,8 @@ export function createWorld(container,state,callback) {
   const playerShadow=addShadow(scene,shadowTexture,.84);
   const coastal=realm==='silvercoast';
   let y=playerFloor(state.player.x,state.player.z),speedY=0,grounded=true;
-  let pitch=.24, distance=9.6;
+  const inSpirehaven=({x,z})=>realm==='silverrun'&&x>silverrunWalls.west&&x<silverrunWalls.east&&z>silverrunWalls.north&&z<silverrunWalls.south;
+  let pitch=inSpirehaven(state.player)?.08:.24, distance=9.6;
   let active=false, paused=false, contextLost=false, needsRender=true;
   let buddy=null,buddyId=null,followTarget=null;
   let building=false,selected=null,rotation=0,preview=null,previewType=null;
@@ -120,6 +121,16 @@ export function createWorld(container,state,callback) {
   edgeLines.visible=false;scene.add(edgeLines);
   const labels=document.querySelector('#world-labels');
   const safeGround=(x,z)=>walkable(x,z)&&landscape.isClear(x,z)&&!town?.blocks(x,z);
+  if(realm==='silverrun'&&!state.transit&&!landscape.isClear(state.player.x,state.player.z)){
+    const p=state.player,origin={x:p.x,z:p.z};
+    search: for(let radius=.6;radius<9;radius+=.6){
+      for(let i=0;i<16;i++){
+        const angle=i*Math.PI/8,x=origin.x+Math.cos(angle)*radius,z=origin.z+Math.sin(angle)*radius;
+        if(safeGround(x,z)){Object.assign(p,{x,z});break search;}
+      }
+    }
+    y=playerFloor(p.x,p.z);
+  }
   const combat=createCombat({scene,container,state,species,realm,terrainHeight,
     walkable:(x,z)=>safeGround(x,z)&&!homestead?.blocks?.(x,z)&&(realm==='sky'||waterSurface(x,z)===null),
     report:callback.combatReport});
@@ -172,7 +183,7 @@ export function createWorld(container,state,callback) {
 
   const lootArt=createLootArt(scene,state,realm,terrainHeight,resources);
   const trail=createItemTrail(scene);
-  let tracking=null,trackedSource=null,trailOrigin=null,trailChecked=-1;
+  let tracking=null,trackedSource=null,trailRoute=null,trailChecked=-1;
   const livePosition=actor=>actor?{x:actor.x,z:actor.z}:null;
 
   function trackingTarget(){
@@ -185,7 +196,7 @@ export function createWorld(container,state,callback) {
 
   function syncTracking(){
     tracking=trackingSelection(state);
-    trailOrigin=null;trailChecked=-1;
+    trailRoute=null;trailChecked=-1;
     trackedSource=trackingTarget();
     trail.draw([]);
     return trackedSource;
@@ -209,27 +220,33 @@ export function createWorld(container,state,callback) {
   function updateItemTrail(t){
     if(!tracking) return;
     trail.tick(t);
-    if(t-trailChecked<.4) return;
-    trailChecked=t;
     const p=state.player,flight=state.transit?.mode==='fly';
-    const next=trackingTarget();
-    const changed=next?.kind!==trackedSource?.kind||next?.id!==trackedSource?.id||next?.x!==trackedSource?.x||next?.z!==trackedSource?.z||next?.realm!==trackedSource?.realm;
-    trackedSource=next;
-    const routed=next?.realm&&next.kind!=='craft';
-    const requiresFlight=routed&&(realm==='sky'||next.realm==='sky')&&
-      (realm!==next.realm||regionAt(p.x,p.z,realm)!==regionAt(next.x,next.z,next.realm));
-    callback.trackingTrail(tracking,next,routed?trackingDistance(state,next):0,requiresFlight&&!flight);
-    if(!routed){trail.draw([]);return;}
-    if(!changed&&trailOrigin?.flight===flight&&Math.hypot(p.x-trailOrigin.x,p.z-trailOrigin.z)<1.45&&Math.abs(y-trailOrigin.y)<2) return;
-    trailOrigin={x:p.x,z:p.z,y,flight};
-    const {route,traversable}=guideTo(next,flight);
-    const goalHeight=next.realm===realm?terrainHeight(next.x,next.z):stream.terrain[next.realm].height(next.x,next.z)+(geography[next.realm].altitude??0)-altitude;
-    trail.draw(route,(x,z,distance)=>{
-      if(!flight) return waterSurface(x,z)??motionFloor(x,z);
-      const safeHeight=motionFloor(x,z)+2.6;
-      if(requiresFlight||next.realm==='sky') return Math.max(safeHeight,y+T.MathUtils.clamp(goalHeight+3-y,-distance*.26,distance*.42));
-      return Math.max(safeHeight,y);
-    },traversable);
+    if(t-trailChecked>=.4||trailRoute&&trailRoute.flight!==flight){
+      trailChecked=t;
+      const next=trackingTarget();
+      const changed=next?.kind!==trackedSource?.kind||next?.id!==trackedSource?.id||next?.x!==trackedSource?.x||next?.z!==trackedSource?.z||next?.realm!==trackedSource?.realm;
+      trackedSource=next;
+      const routed=next?.realm&&next.kind!=='craft';
+      const requiresFlight=routed&&(realm==='sky'||next.realm==='sky')&&
+        (realm!==next.realm||regionAt(p.x,p.z,realm)!==regionAt(next.x,next.z,next.realm));
+      callback.trackingTrail(tracking,next,routed?trackingDistance(state,next):0,requiresFlight&&!flight);
+      if(!routed) trailRoute=null;
+      else if(changed||!trailRoute||trailRoute.flight!==flight||Math.hypot(p.x-trailRoute.x,p.z-trailRoute.z)>=1.45){
+        const groundAtTarget=next.realm===homeland?valleyHeight:stream.terrain[next.realm].height;
+        const goalHeight=groundAtTarget(next.x,next.z)+(geography[next.realm].altitude??0)-altitude;
+        trailRoute={...guideTo(next,flight),x:p.x,z:p.z,flight,goalHeight,rises:requiresFlight||next.realm==='sky'};
+      }
+    }
+    if(!trailRoute){trail.draw([]);return;}
+    const {route,traversable,goalHeight,rises}=trailRoute;
+    const connected=connectTrail(p,route,traversable);
+    if(!connected.length&&route.length>1) trailRoute=null;
+    trail.draw(connected,(x,z,distance)=>{
+      const surface=motionFloor(x,z);
+      const guideY=flight?Math.max(surface+2.6,rises?y+T.MathUtils.clamp(goalHeight+3-y,-distance*.26,distance*.42):y)
+        :waterSurface(x,z)??surface;
+      return T.MathUtils.lerp(y,guideY,T.MathUtils.smoothstep(distance,0,1.5));
+    });
   }
   function collectLoot(id){
     if(!active||paused||building||combat.isFighting()) return null;
@@ -666,17 +683,18 @@ export function createWorld(container,state,callback) {
     const horizontal=Math.cos(angle)*camDist;
     const sx=Math.sin(p.yaw),sz=Math.cos(p.yaw);
     const shoulder=shipInterior?.29:interior?0:building?(aspect<.85?1.05:1.93):fighting?.76+2.15*meleeCamera:0;
-    const coastCamera=realm==='silvercoast'&&!building;
+    const cityCamera=inSpirehaven(p)&&!building;
+    const structureCamera=(realm==='silvercoast'||cityCamera)&&!building;
     let fraction=1;
-    if(!inFlight&&(fighting||interior||valley&&!building||coastCamera)){
+    if(!inFlight&&(fighting||interior||valley&&!building||structureCamera)){
       for(let i=0;i<=9;i++){
         const sample=.19+i*.09;
         const x=p.x+sx*horizontal*sample+sz*shoulder,z=p.z+sz*horizontal*sample-sx*shoulder;
         const cameraY=y+1.37+Math.sin(angle)*camDist*sample;
         const cottage=valley&&homes.some(([px,pz,,,,scale])=>
           Math.abs(x-px)<2.82*scale&&Math.abs(z-pz)<2.56*scale&&cameraY<terrainHeight(px,pz)+3.9*scale);
-        const coastalBuilding=coastCamera&&!landscape.isClear(x,z)&&cameraY<terrainHeight(x,z)+6.25;
-        if(cottage||coastalBuilding||shipInterior&&!inHold(x,z)||homestead?.blocks?.(x,z)||fighting&&!interior&&!safeGround(x,z)){
+        const structure=structureCamera&&!landscape.isClear(x,z)&&cameraY<terrainHeight(x,z)+(cityCamera?7.4:6.25);
+        if(cottage||structure||shipInterior&&!inHold(x,z)||homestead?.blocks?.(x,z)||fighting&&!interior&&!safeGround(x,z)){
           fraction=Math.max(.18,sample-.13);
           break;
         }
@@ -687,7 +705,7 @@ export function createWorld(container,state,callback) {
     ideal.set(camX,shipInterior?Math.min(height,marigold.deck-.30):Math.max(height,terrainHeight(camX,camZ)+1.65),camZ);
     const lookAhead=interior?1.35:building?2.35:aspect<.85?1.75:3.25;
     const lookUp=interior||building||fighting?0:Math.max(0,-pitch)*18;
-    const lookHeight=(inFlight?-1.5:interior?1.43:building?.68:fighting?1.64:2.08)+lookUp;
+    const lookHeight=(inFlight?-1.5:interior?1.43:building?.68:fighting?1.64:2.08)+lookUp+(cityCamera&&!inFlight?1.62:0);
     target.set(p.x-sx*lookAhead+sz*shoulder,y+lookHeight,p.z-sz*lookAhead-sx*shoulder);
     if(opponent){
       const gap=Math.hypot(opponent.x-p.x,opponent.z-p.z);
@@ -1117,7 +1135,6 @@ export function createWorld(container,state,callback) {
   },options);
   canvas.addEventListener('pointercancel',()=>{gesture=null;mouseAim=false;},options);
   canvas.addEventListener('pointerleave',()=>{mouseAim=false;combat.aim(null);},options);
-  canvas.addEventListener('contextmenu',e=>e.preventDefault(),options);
   canvas.addEventListener('wheel',e=>{
     if(active&&!paused){e.preventDefault();distance=T.MathUtils.clamp(distance+e.deltaY*.009,5.8,17);}
   },{...options,passive:false});
