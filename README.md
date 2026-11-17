@@ -2,20 +2,20 @@
 
 A cozy browser adventure where you can befriend a unicorn, grow a cottage garden, and follow the road wherever it goes.
 
-![A rainbow over Petalwick’s blossom trees and cottages](docs/gameplay/petalwick.webp)
+![A teddy bear and Pearlyspark beneath a rainbow in Petalwick](docs/gameplay/petalwick.webp)
 
 ## A few places to wander
 
 | 🌾 Windmere | ✨ Moonjar Marsh |
 | --- | --- |
-| ![Pink sails turning above Windmere’s cottages](docs/gameplay/windmere.webp) | ![Lanterns and little creatures gathered in Moonjar Marsh at night](docs/gameplay/moonjar-marsh.webp) |
+| ![A teddy bear traveler beneath Windmere’s pink windmill sails](docs/gameplay/windmere.webp) | ![A teddy bear and Buttoncap beside the lantern path in Moonjar Marsh](docs/gameplay/moonjar-marsh.webp) |
 | Follow the west road from Spirehaven to the windmills. | Take a lantern-lit walk after dusk. |
 
 ### ⚓ All aboard the Black Marigold
 
 Follow the coast road to Corsair Cove. At the end of the jetty, take the gangplank aboard and explore the cargo hold below deck.
 
-![The Black Marigold moored beside the wooden jetty in Corsair Cove](docs/gameplay/black-marigold.webp)
+![A teddy bear on the jetty beside the Black Marigold](docs/gameplay/black-marigold.webp)
 
 ## Play locally
 
