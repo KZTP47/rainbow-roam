@@ -60,7 +60,72 @@ function teddy(look){
   return {group,model,head,legs,arms,kind:'person'};
 }
 
+function moonling(look){
+  const skin=wardrobe.glowSkin.choices[look.glowSkin??0][1],coat=wardrobe.coat.choices[look.coat][1];
+  const iris=wardrobe.eyes.choices[look.eyes][1];
+  const group=new T.Group(),model=new T.Group(),head=new T.Group(),arms=[],legs=[];
+  group.add(model);model.add(head);head.position.y=1.32;
+  part(model,'fine',coat,0,.77,0,.34,.47,.26);
+  part(model,'fine','#f6dfb4',0,1.06,.02,.33,.11,.26);
+  part(model,'diamond','#c8fbdf',0,.87,.258,.09,.12,.045);
+  part(head,'fine',skin,0,.09,0,.50,.44,.33);
+  for(const side of [-1,1]){
+    part(head,'fine','#2e354a',side*.20,.11,.27,.14,.177,.077,0,side*.30,side*-.22);
+    part(head,'fine',iris,side*.20,.082,.326,.10,.095,.034);
+    part(head,'sphere','#fff5da',side*.20-.026,.167,.341,.036,.043,.018);
+    part(head,'soft','#efa8a7',side*.33,-.028,.239,.077,.044,.033);
+    branch(head,skin,[side*.22,.43,0],[side*.34,.69,-.04],.032);
+    part(head,'soft','#ffe3a3',side*.34,.70,-.04,.083,.089,.081);
+    const arm=new T.Group(),leg=new T.Group();model.add(arm,leg);arms.push(arm);legs.push(leg);
+    arm.position.set(side*.30,.97,0);leg.position.set(side*.14,.43,0);
+    part(arm,'fine',skin,side*.065,-.19,0,.098,.25,.095,0,0,side*.15);
+    part(leg,'fine',skin,0,-.16,0,.107,.20,.11);
+    part(leg,'fine',coat,0,-.34,.05,.126,.078,.16);
+  }
+  branch(head,ink,[-.056,-.065,.314],[0,-.085,.319],.009);
+  branch(head,ink,[0,-.085,.319],[.056,-.065,.314],.009);
+  return {group,model,head,arms,legs,kind:'person'};
+}
+
+function mermaid(look){
+  const avatar=human(outfitColors(look),{...look,outfit:0,morph:1},false);
+  for(const leg of avatar.legs)leg.visible=false;
+  const color=wardrobe.scales.choices[look.scales??0][1];
+  const tail=new T.Group();avatar.model.add(tail);tail.position.set(0,1.00,0);
+  const rings=[[.09,.178,.126,0],[-.06,.218,.165,-.01],[-.23,.211,.157,-.035],[-.44,.167,.131,-.085],
+    [-.64,.115,.098,-.16],[-.78,.08,.070,-.27],[-.86,.055,.050,-.38]];
+  const positions=[],indices=[],sides=24;
+  for(const [i,[y,rx,rz,z]] of rings.entries()){
+    for(let j=0;j<sides;j++){
+      const angle=j*Math.PI*2/sides;
+      positions.push(rx*Math.sin(angle),y,z+rz*Math.cos(angle));
+      if(i){const a=(i-1)*sides+j,b=(i-1)*sides+(j+1)%sides;indices.push(a,a+sides,b,b,a+sides,b+sides);}
+    }
+  }
+  const mesh=new T.BufferGeometry();mesh.setAttribute('position',new T.Float32BufferAttribute(positions,3));mesh.setIndex(indices);mesh.computeVertexNormals();
+  const body=new T.Mesh(mesh,material(color));body.castShadow=true;tail.add(body);
+  for(let row=0;row<3;row++)for(let j=0;j<7;j++){
+    const angle=j*Math.PI*2/7+row*.34;
+    part(tail,'soft',j%2?color:'#a9d5c7',(.205-row*.014)*Math.sin(angle),-.13-row*.10,
+      -.032-row*.017+(.15-row*.009)*Math.cos(angle),.044,.054,.029,0,angle);
+  }
+  const fin=new T.Group();tail.add(fin);fin.position.set(0,-.83,-.34);
+  for(const side of [-1,1]){
+    const lobe=new T.Shape();
+    lobe.moveTo(0,0);lobe.bezierCurveTo(.10,.055,.28,.037,.38,.19);
+    lobe.bezierCurveTo(.36,.023,.31,-.096,.19,-.12);lobe.quadraticCurveTo(.09,-.14,0,-.045);
+    const fluke=new T.Mesh(new T.ExtrudeGeometry(lobe,{depth:.042,bevelEnabled:false,curveSegments:12}),material(color));
+    fluke.scale.x=side;fluke.rotation.x=.45;fin.add(fluke);
+    branch(fin,'#afdcd4',[side*.045,-.016,.052],[side*.24,.012,.065],.011);
+    for(let j=0;j<5;j++)part(avatar.model,'soft','#ebbdad',side*(.105+j*.012),1.38+.024*Math.cos(j*.6),.13,.025,.074,.031,0,0,side*(j-2)*.21);
+  }
+  avatar.pose=(t,moving)=>{tail.rotation.x=.12+.13*Math.sin(t*(moving?7:2));fin.rotation.x=.27*Math.sin(t*(moving?7:2)-.6);};
+  return avatar;
+}
+
 export function traveler(look){
+  if(look.morph===5)return mermaid(look);
+  if(look.morph===4) return moonling(look);
   if(look.morph===3) return teddy(look);
   const avatar=human(outfitColors(look),look,true);
   if(look.morph!==2) return avatar;

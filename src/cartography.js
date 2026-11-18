@@ -1,13 +1,16 @@
 import {skyCounterPoint,skyIslands,skyRim} from './sky-islands.js';
+import {wardWorkshops} from './ward-workshops.js';
+import {wards,wardRoads} from './city-wards.js';
 import {geography} from './overworld.js';
 import {atlas,realmRegions} from './horizons.js';
 import {lake,paths,seeded} from './map-data.js';
 import {regions,villagers} from './content.js';
 import {castleLandmarks} from './castle.js';
-import {townProfiles,townServicesForPlace,townWater,townsByPlace,townPavement} from './town-data.js';
+import {regionalRoomById,townProfiles,townServicesForPlace,townWater,townsByPlace,townPavement} from './town-data.js';
 import {riverCenter,riverWidth,silverrunLandmarks,silverrunPaths,silverrunWalls} from './silverrun.js';
 import {coastLandmarks,coastPaths,coastRiverX,piers,shoreZ} from './silvercoast.js';
 import {gangplank} from './marigold.js';
+import {landmarkPoint,newRegions,regionalPath} from './new-regions.js';
 
 export const campusLandmarks=[
   ['Great Hall',0,-18,'hall'],['Clock Tower',-12,21,'hall'],['Covered Bridge',-42,11,'bridge'],
@@ -42,7 +45,7 @@ const colorways={
   verdigris:['#63ab91','#d6c981','#488978','#4eb4b2'],
   orchards:['#a8be76','#e3c079','#718d62','#63b5be']
 };
-const paletteFor=id=>colorways[id]??[geography[id].tone,'#d8c990','#749585','#6db8bd'];
+const paletteFor=id=>colorways[id]??newRegions[id]?.palette??[geography[id].tone,'#d8c990','#749585','#6db8bd'];
 const lands=Object.entries(geography).filter(([id])=>id!=='sky');
 const chartBounds={
   left:Math.min(...lands.map(([,r])=>r.x-r.rx))-33,
@@ -60,8 +63,15 @@ export const localPlaces=(realm)=>realm==='valley'
 
 export function localFrame(realm,id){
   const place=regions[id];
+  if(wards[realm])return {x:0,z:3,rx:59,rz:49};
   if(realm==='silverrun'&&id==='spirehaven') return {x:6,z:8,rx:34,rz:29};
   if(realm==='silvercoast'&&id) return id==='saltwick'?{x:-30,z:13,rx:29,rz:29}:{x:30,z:21,rx:26,rz:32};
+  if(place&&newRegions[realm]){
+    const [lx,lz]=landmarkPoint(newRegions[realm]);
+    const left=Math.min(place.x-22,lx-7),right=Math.max(place.x+22,lx+7);
+    const top=Math.min(place.z-22,lz-7),bottom=Math.max(place.z+22,lz+7);
+    return {x:(left+right)/2,z:(top+bottom)/2,rx:(right-left)/2,rz:(bottom-top)/2};
+  }
   if(place) return {x:place.x,z:place.z,rx:realm==='sky'?21.5:realm==='hogwarts'?52:townsByPlace[id]?24:21,
     rz:realm==='sky'?20:realm==='hogwarts'?53:townsByPlace[id]?22:18};
   if(realm==='sky'){
@@ -82,6 +92,7 @@ function locator(canvas,frame){
 }
 
 export function routeLines(realm){
+  if(wards[realm]) return wardRoads;
   if(realm==='silverrun') return silverrunPaths;
   if(realm==='silvercoast') return coastPaths;
   if(realm==='valley') return [...paths,[[0,-8],[-29,-12],[-61,-4],[-96,0]],
@@ -97,14 +108,15 @@ export function routeLines(realm){
   const local=realmRegions(realm).map(([,r])=>[r.x,r.z]);
   if(townProfiles[realm]){
     const [x,z]=local[0];
-    const [a,b]=local[1];
+    const [a,b]=local[1]??townProfiles[realm].wilderness;
     const origin=geography[realm];
     const exits=lands.filter(([id,r])=>id!==realm&&neighbors(origin,r)).map(([,r])=>{
       const dx=r.x-origin.x,dz=r.z-origin.z;
       return [[x,z],[dx*.22,dz*.26],
         [dx===0?0:Math.sign(dx)*origin.rx,dz===0?0:Math.sign(dz)*origin.rz]];
     });
-    return [[[x,z],[x*.64+a*.36-1.6,z*.41+b*.59],[a,b]],...exits];
+    const trail=newRegions[realm]?regionalPath(newRegions[realm]):[[x,z],[x*.64+a*.36-1.6,z*.41+b*.59],[a,b]];
+    return [trail,...exits];
   }
   return local.map((p,i)=>{
     const q=local[(i+1)%local.length],mx=(p[0]+q[0])/2,mz=(p[1]+q[1])/2;
@@ -428,9 +440,12 @@ export function paintRegion(canvas,realm,focus,state,height){
   const signals=realm==='hogwarts'?allCampusLandmarks:realm==='sky'&&focus?aeryLandmarks(focus):colonies.map(([,p])=>[p.name,p.x,p.z,
     realm==='sky'?'wind':realm==='frost'?'mountain':realm==='woods'?'tree':'hall']);
   if(focus){
+    if(realm==='dyeward'){const room=wardWorkshops[realm];signals.push([room.name,room.x,room.z,'hall']);}
+    if(wards[realm])signals.push([wards[realm].landmark,0,-5,'hall'],['Market lantern',-19,8,'wind'],[wards[realm].pet[1]+' trail',-34,13,'tree']);
     if(realm==='silverrun') signals.push(...(silverrunLandmarks[focus]??[]));
     if(realm==='silvercoast') signals.push(...(coastLandmarks[focus]??[]));
-    for(const marker of townServicesForPlace(focus)) signals.push([marker.name,marker.x,marker.z,
+    if(newRegions[realm]) signals.push([newRegions[realm].landmark,...landmarkPoint(newRegions[realm]),'hall']);
+    for(const marker of townServicesForPlace(focus)) signals.push([regionalRoomById(marker.id)?.name??marker.name,marker.x,marker.z,
       marker.kind==='garden'?'tree':marker.kind==='lookout'?'mountain':'hall']);
   }
   c.font='800 '+Math.round(12*ratio)+'px Nunito, sans-serif';c.textAlign='center';
@@ -484,12 +499,14 @@ function aeryLandmarks(id){
 }
 
 export function mapFeatures(realm,place){
+  if(wards[realm])return [...new Set([wards[realm].square,wards[realm].landmark,wardWorkshops[realm].name,wards[realm].title])];
   if(realm==='hogwarts') return allCampusLandmarks.map(([name])=>name);
   if(realm==='sky'&&place) return aeryLandmarks(place).map(([name])=>name);
   if(realm==='silverrun'&&silverrunLandmarks[place]) return silverrunLandmarks[place].map(([name])=>name);
   if(realm==='silvercoast'&&coastLandmarks[place]) return coastLandmarks[place].map(([name])=>name);
   const region=regions[place];
   const points=townServicesForPlace(place);
-  const land=townProfiles[realm]?.feature;
-  return [region?.note??atlas[realm].tagline,...(land?[land]:feature[realm]??[]),...points.map(t=>t.name)];
+  const land=newRegions[realm]?.landmark??townProfiles[realm]?.feature;
+  return [region?.note??atlas[realm].tagline,...(land?[land]:feature[realm]??[]),
+    ...points.map(t=>regionalRoomById(t.id)?.name??t.name)];
 }

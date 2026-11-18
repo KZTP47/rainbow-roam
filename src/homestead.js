@@ -21,8 +21,39 @@ export const extensions={
   workshop:{name:'Workshop',icon:'hammer',color:'#d6a583',offset:6,spots:['By the workbench','Tool-wall corner'],cost:{coins:14,wood:6,stone:4},
     summary:'A workbench that saves materials when you make rugs.',service:'Sew a patchwork rug'},
   loft:{name:'Reading loft',icon:'book',color:'#b0a6c9',offset:8,spots:['Loft window','Bookshelf nook'],cost:{coins:16,wood:7,petal:4},
-    summary:'An upstairs retreat where you can rest while the garden grows.',service:'Rest in the loft'}
+    summary:'A reading retreat where you can rest while the garden grows.',service:'Rest in the loft'},
+  kitchen:{name:'Hearth kitchen',icon:'cookie',color:'#d5a070',offset:10,spots:['Pantry alcove','Beside the oven'],cost:{coins:13,wood:5,stone:5},
+    summary:'Cook honey carrot stew with one honey carrot and one sunberry.',service:'Cook honey carrot stew'},
+  companionNook:{name:'Companion nook',icon:'paw',color:'#8bac98',offset:12,spots:['By the cushions','Along the low window'],cost:{coins:12,wood:5,petal:4},
+    summary:'Spend time with your active companion to build affinity.',service:'Sit with your companion'},
+  wizardTower:{name:'Wizard Tower',icon:'sparkles',color:'#a999d4',offset:14,spots:['Starglass window','Chart table'],cost:{coins:18,stone:7,crystal:2},
+    summary:'Link your homestead to wizard towers built in dungeons.',service:'Travel by wizard tower'}
 };
+export const homesteadLayout={
+  sunroom:{x:-4.34,z:-.18,halfWidth:1.46,halfDepth:1.55,door:{side:'east',offset:0},join:'west'},
+  workshop:{x:1.42,z:-3.60,halfWidth:1.32,halfDepth:1.51,door:{side:'south',offset:0},join:'north'},
+  loft:{x:-1.57,z:-3.83,halfWidth:1.26,halfDepth:1.74,door:{side:'south',offset:0},join:'north'},
+  kitchen:{x:4.19,z:.12,halfWidth:1.31,halfDepth:1.64,door:{side:'west',offset:0},join:'east'},
+  companionNook:{x:-4.63,z:3.57,halfWidth:1.45,halfDepth:1.31,door:{side:'south',offset:0}},
+  wizardTower:{x:-4.63,z:7.78,halfWidth:1.48,halfDepth:1.45,door:{side:'south',offset:0}}
+};
+export const homesteadDoorHalfWidth=.66;
+export function homesteadServicePoint(id){
+  const room=Object.hasOwn(homesteadLayout,id)?homesteadLayout[id]:null;
+  return room?[home.x+room.x,home.z+room.z]:undefined;
+}
+export const wizardTowerPoint=homesteadServicePoint('wizardTower');
+
+export function propertyDoors(homestead){
+  if(!homestead?.owned) return [];
+  return [['house',home.x,home.z+2.18],...Object.entries(homesteadLayout).flatMap(([id,room])=>{
+    if(!homestead.extensions?.[id]) return [];
+    const {side}=room.door;
+    const shiftX=side==='east'?room.halfWidth:side==='west'?-room.halfWidth:0;
+    const shiftZ=side==='south'?room.halfDepth:side==='north'?-room.halfDepth:0;
+    return [[id,home.x+room.x+shiftX,home.z+room.z+shiftZ]];
+  })];
+}
 export const plots=Array.from({length:6},(_,i)=>[18+i%2*2.1,21+Math.floor(i/2)*1.8]);
 export const farmItems={
   ...Object.fromEntries(Object.entries(crops).map(([id,crop])=>[id,[crop.name,'sprout']])),
@@ -76,6 +107,8 @@ export function roomReady(state,id,now=Date.now()){
   const built=state.homestead.extensions?.[id];
   if(!built) return false;
   if(id==='workshop') return state.inventory.wood>=1&&state.inventory.petal>=1;
+  if(id==='kitchen') return state.inventory.honeyCarrot>=1&&state.inventory.berry>=1;
+  if(id==='companionNook') return Boolean(state.active&&state.companions?.includes(state.active))&&now>=built.next;
   return now>=built.next;
 }
 
@@ -98,11 +131,21 @@ function slotLocation(homestead,index){
 export const nearHomestead=state=>state.realm==='valley'&&!state.transit&&
   Math.hypot(state.player.x-home.x,state.player.z-home.z)<14;
 
-export function propertyArea(player,realm){
+export function propertyArea(player,realm,homestead){
   if(realm!=='valley') return null;
   if(Math.abs(player.x-home.x)<2.65&&Math.abs(player.z-home.z)<1.8) return 'house';
+  for(const [id,room] of Object.entries(homesteadLayout)){
+    if(homestead?.owned&&homestead.extensions?.[id]&&
+      Math.abs(player.x-home.x-room.x)<room.halfWidth-.10&&Math.abs(player.z-home.z-room.z)<room.halfDepth-.10) return id;
+  }
   if(player.x>17.05&&player.x<21.35&&player.z>19.65&&player.z<25.83) return 'garden';
   return null;
+}
+
+export function propertyArrival(view,homestead){
+  if(view==='house') return [home.x,home.z+1.5];
+  if(view==='garden') return [19,25.25];
+  if(homestead?.extensions?.[view]&&Object.hasOwn(homesteadLayout,view)) return homesteadServicePoint(view);
 }
 
 export function workHomestead(state,action,slot,item,now=Date.now()){
@@ -125,7 +168,9 @@ export function workHomestead(state,action,slot,item,now=Date.now()){
       else inventory[resource]-=amount;
     }
     built[item]={next:0,decor:room.spots.map(()=>null)};
-    return {title:room.name+' built',detail:'Open Walk around and follow the doorway from the cottage.'};
+    return {title:room.name+' built',detail:homesteadLayout[item].join
+      ?'Follow the new doorway from the cottage.'
+      :'Find the new entrance in the cottage yard.'};
   }
   if(action==='service'){
     if(!roomReady(state,item,now)) return null;
@@ -147,6 +192,18 @@ export function workHomestead(state,action,slot,item,now=Date.now()){
       homestead.plots.forEach(plot=>{if(plot&&plot.readyAt>now) plot.readyAt=now+(plot.readyAt-now)*.25;});
       built.next=now+45000;
       return {title:'Rested in the loft',detail:'Six in-game hours passed. Planted beds are closer to harvest.'};
+    }
+    if(item==='kitchen'){
+      inventory.honeyCarrot--;inventory.berry--;
+      inventory.honeyStew=(inventory.honeyStew??0)+1;
+      return {title:'Honey carrot stew cooked',detail:'One bowl added to your satchel.'};
+    }
+    if(item==='companionNook'){
+      state.care??={};
+      const care=state.care[state.active]??={};
+      care.affinity=Math.min(12,(care.affinity??0)+1);
+      built.next=now+45000;
+      return {title:'Time with your companion',detail:'Your companion gained one point of affinity.'};
     }
   }
   if(!Number.isInteger(slot)||slot<0) return null;

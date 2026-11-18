@@ -2,30 +2,35 @@ import * as T from 'three';
 import {animate,buildPiece,creature,person,part,material} from './models.js';
 import {populate,resourceModel,homes,batchStatic,terrainHeight as valleyHeight,walkable as valleyWalkable,lakeValue} from './landscape.js';
 import {horizonResource,horizonTerrain,populateHorizon,travelArch,voyageGate} from './horizon-land.js';
+import {wards,relayPosts} from './city-wards.js';
 import {atlas,homeland,horizonResources,realmRegions} from './horizons.js';
 import {skyLight,sunDirection} from './daylight.js';
 import {human,disposeHuman} from './human.js';
 import {dailyActivity,residentRoutine,workTools,workPose,playStyle,playPosition} from './residents.js';
-import {blackLake} from './castle.js';
+import {blackLake,campusSigns} from './castle.js';
 import {streamLandscape} from './world-stream.js';
 import {canFly,geography,worldPoint,regionPoint,groundRealmAt,nearestGround,worldBounds,oceanLevel} from './overworld.js';
 import {traveler} from './traveler.js';
 import {marketStalls} from './market.js';
 
-import {home as cloverCottage} from './homestead.js';
+import {home as cloverCottage,extensions,homesteadLayout,homesteadServicePoint,propertyArea,propertyDoors} from './homestead.js';
 import {createCombat} from './combat.js';
 import {nearbyLoot,pickUpLoot} from './loot.js';
+import {landmarkPoint,newRegions} from './new-regions.js';
 import {createLootArt} from './loot-art.js';
 import {findItemTarget,trackingDistance} from './item-tracking.js';
 import {findQuestTarget,trackingSelection} from './quest-tracking.js';
 import {connectTrail,createItemTrail,trailPath} from './item-trail.js';
-import {townServiceAt,townWater} from './town-data.js';
+import {regionalRoomById,regionalRoomsFor,townServiceAt,townWater} from './town-data.js';
 import {populateTown} from './towns.js';
 import {icon} from './icons.js';
 import {items,species,wildlife,villagers,resourceSpots,regionAt} from './content.js';
-import {inRiver,riverLevel,silverrunWalls} from './silverrun.js';
+import {inRiver,riverLevel,silverrunWalls,spirehavenCitizens} from './silverrun.js';
 import {coastRiverY,inCoastRiver,pierAt,seaHeight} from './silvercoast.js';
-import {atStairs,canMoveOnShip,inHold,marigold,onMarigold,onShip,switchDeck} from './marigold.js';
+import {atStairs,canMoveOnShip,gangplank,inHold,marigold,onMarigold,onShip,stairs,switchDeck} from './marigold.js';
+import {dialFaces,inRoom,roomFloorOffset,roomPoint,rooms} from './spirehaven-rooms.js';
+import {caveObstructs,cavePoints,createDoorSignals,drawCave,roomDoorSignal} from './adventure-doors.js';
+import {dungeonEntrances} from './dungeons.js';
 
 const GRID=1.2;
 const TAU=Math.PI*2;
@@ -41,6 +46,9 @@ export function createWorld(container,state,callback) {
   const land=valley?null:horizonTerrain(realm);
   const terrainHeight=land?.height??valleyHeight;
   const walkable=land?.walkable??valleyWalkable;
+  const walkInRooms=realm==='silverrun'?rooms:regionalRoomsFor(realm);
+  const roomAt=(x,z)=>walkInRooms.find(room=>inRoom(room,x,z))??null;
+  const insideRoom=()=>state.transit?null:roomAt(state.player.x,state.player.z);
   const events=new AbortController();
   const options={signal:events.signal};
   const renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
@@ -73,7 +81,82 @@ export function createWorld(container,state,callback) {
   sun.castShadow=true;
   scene.add(sun,sun.target);
   const fill=new T.DirectionalLight('#d7e1ff',.55);fill.position.set(10,9,-18);scene.add(fill);
+  const roomBackdrop=new T.Color('#bcb0c1');
+  function indoorLayers(group){
+    if(walkInRooms.length||valley){
+      const count=valley?1+Object.keys(extensions).length:walkInRooms.length;
+      group.traverse(node=>{for(let layer=1;layer<=count;layer++) node.layers.enable(layer);});
+    }
+  }
+  if(walkInRooms.length||valley){
+    const ambientRoom=new T.HemisphereLight('#ffecd6','#ae98b8',2.95);
+    const windowLight=new T.DirectionalLight('#ffe4bb',1.55);
+    windowLight.position.set(-3,9,6);
+    for(const light of [ambientRoom,windowLight]){
+      light.layers.disable(0);indoorLayers(light);scene.add(light);
+    }
+  }
   const landscape=valley?populate(scene):populateHorizon(scene,realm,land,state);
+  const doorSignals=createDoorSignals(scene);
+  const ward=wards[realm];
+  let relayIndex=0,relayDeadline=0,lastRelayText='';
+  const relayNames=['Market lantern','Survey lane','North corner','East arcade'];
+  const course=realm==='cooperward'?[0,3,2,1,0]:realm==='starward'?[0,2,3,1,0]:[0,1,2,3,0];
+  const relayHud=ward?document.createElement('div'):null;
+  if(ward){
+    relayHud.className='lantern-race';relayHud.hidden=true;container.append(relayHud);
+    relayPosts.forEach(([x,z],i)=>doorSignals.add({x,z,y:terrainHeight(x,z)+3.14,radius:90,enabled:()=>course[relayIndex]===i}));
+  }
+  function lightLantern(){
+    if(!ward||state.transit)return;
+    const [x,z]=relayPosts[course[relayIndex]];
+    if(Math.hypot(state.player.x-x,state.player.z-z)>=3)return;
+    if(relayIndex===0)relayDeadline=elapsed+65;
+    relayIndex++;
+    if(relayIndex===course.length){
+      relayIndex=0;relayHud.hidden=true;
+      state.wallet.coins+=10;const food=ward.pet[5];state.inventory[food]=(state.inventory[food]??0)+2;
+      callback.combatReport({title:'Lantern circuit complete',detail:'10 Suncoins and 2 '+items[food][0],icon:'sparkles'});
+    }
+  }
+  function updateRelay(){
+    if(!relayIndex)return;
+    if(elapsed>=relayDeadline){
+      relayIndex=0;relayHud.hidden=true;callback.relayTimeout();return;
+    }
+    const target=course[relayIndex],[x,z]=relayPosts[target];
+    const meters=Math.round(Math.hypot(state.player.x-x,state.player.z-z));
+    const text=relayNames[target]+' · '+meters+' m · '+Math.ceil(relayDeadline-elapsed)+' s';
+    if(lastRelayText!==text){relayHud.textContent=text;lastRelayText=text;}
+    relayHud.hidden=false;
+  }
+  const caves=dungeonEntrances.filter(entry=>entry.realm===realm);
+  for(const cave of caves){
+    drawCave(scene,cave,terrainHeight);
+    const [x,z]=cavePoints(cave,0,1.42);
+    doorSignals.add({x,z,y:terrainHeight(cave.x,cave.z)+3.00});
+  }
+  for(const room of walkInRooms)doorSignals.add(roomDoorSignal(room,terrainHeight));
+  if(realm==='silverrun'){
+    doorSignals.add({x:12,z:7.15,y:terrainHeight(12,7.15)+2.65,radius:23});
+  }
+  if(realm==='hogwarts'){
+    for(const sign of campusSigns(terrainHeight)){
+      if(sign.door) doorSignals.add({x:sign.x+Math.sin(sign.yaw)*1.24,z:sign.z+Math.cos(sign.yaw)*1.24,y:sign.y+1.05,radius:21});
+    }
+  }
+  if(realm==='silvercoast'){
+    doorSignals.add({x:gangplank.to,z:gangplank.z,y:marigold.deck+2.17,enabled:()=>!state.player.belowDeck});
+    doorSignals.add({x:marigold.x,z:stairs.top+.44,y:marigold.deck+2.02,enabled:()=>!state.player.belowDeck});
+  }
+  if(valley){
+    for(const [id,x,z] of propertyDoors({owned:true,extensions})){
+      const side=homesteadLayout[id]?.door.side??'south';
+      const approach={east:[1,0],west:[-1,0],south:[0,1],north:[0,-1]}[side];
+      doorSignals.add({x:x+approach[0]*1.10,z:z+approach[1]*1.10,y:terrainHeight(x,z)+2.30,enabled:()=>state.homestead.owned&&
+        (id==='house'||Boolean(state.homestead.extensions[id]))});
+    }
+  }
   const town=valley?populateTown(scene,'village',terrainHeight):null;
   if(town){batchStatic(scene,town.root);town.root.removeFromParent();}
   const stream=streamLandscape(scene,realm,state);
@@ -98,9 +181,12 @@ export function createWorld(container,state,callback) {
 
   let player=traveler(state.look);
   player.group.scale.setScalar(1.13);
+  indoorLayers(player.group);
   scene.add(player.group);
   const shadowTexture=makeShadow();
   const playerShadow=addShadow(scene,shadowTexture,.84);
+  indoorLayers(playerShadow);
+  let cameraRoom=null,roomZoom=1;
   const coastal=realm==='silvercoast';
   let y=playerFloor(state.player.x,state.player.z),speedY=0,grounded=true;
   const inSpirehaven=({x,z})=>realm==='silverrun'&&x>silverrunWalls.west&&x<silverrunWalls.east&&z>silverrunWalls.north&&z<silverrunWalls.south;
@@ -120,13 +206,15 @@ export function createWorld(container,state,callback) {
   const edgeLines=new T.LineSegments(new T.EdgesGeometry(parcelGeometry),new T.LineBasicMaterial({color:'#fff2ca',transparent:true,opacity:.8,depthWrite:false}));
   edgeLines.visible=false;scene.add(edgeLines);
   const labels=document.querySelector('#world-labels');
-  const safeGround=(x,z)=>walkable(x,z)&&landscape.isClear(x,z)&&!town?.blocks(x,z);
-  if(realm==='silverrun'&&!state.transit&&!landscape.isClear(state.player.x,state.player.z)){
+  const safeGround=(x,z)=>walkable(x,z)&&landscape.isClear(x,z)&&!town?.blocks(x,z)&&!caves.some(cave=>caveObstructs(cave,x,z));
+  if(!state.transit&&((walkInRooms.length&&!landscape.isClear(state.player.x,state.player.z))||
+    caves.some(cave=>caveObstructs(cave,state.player.x,state.player.z))||
+    homestead?.blocks?.(state.player.x,state.player.z))){
     const p=state.player,origin={x:p.x,z:p.z};
     search: for(let radius=.6;radius<9;radius+=.6){
       for(let i=0;i<16;i++){
         const angle=i*Math.PI/8,x=origin.x+Math.cos(angle)*radius,z=origin.z+Math.sin(angle)*radius;
-        if(safeGround(x,z)){Object.assign(p,{x,z});break search;}
+        if(safeGround(x,z)&&!homestead?.blocks?.(x,z)){Object.assign(p,{x,z});break search;}
       }
     }
     y=playerFloor(p.x,p.z);
@@ -136,6 +224,7 @@ export function createWorld(container,state,callback) {
     report:callback.combatReport});
   combat.setActive(false);
   const residents=villagers.filter(v=>(v.realm??homeland)===realm);
+  if(realm==='silverrun') residents.push(...spirehavenCitizens);
   const agents=residents.map((data,i)=>{
     const look=data.portrait?human(data.colors,data.portrait):person(data.colors,false,i);
     const name=makeLabel(labels,data.name,i===0?'!':'·');
@@ -321,6 +410,7 @@ export function createWorld(container,state,callback) {
     next.group.position.copy(player.group.position);
     next.group.rotation.copy(player.group.rotation);
     next.group.scale.copy(player.group.scale);
+    indoorLayers(next.group);
     scene.remove(player.group);
     disposeHuman(player.group);
     scene.add(next.group);
@@ -387,6 +477,7 @@ export function createWorld(container,state,callback) {
     const data=species[buddyId],look=creature(data);
     const shadow=addShadow(scene,shadowTexture,data.kind==='unicorn'?.69:.51);
     scene.add(look.group);
+    indoorLayers(look.group);indoorLayers(shadow);
     buddy={look,shadow,x:state.player.x+1.3,z:state.player.z+1.7,seed:103};
   }
 
@@ -458,6 +549,8 @@ export function createWorld(container,state,callback) {
   }
 
   function playerFloor(x,z){
+    const room=roomAt(x,z);
+    if(room) return terrainHeight(room.x,room.z)+roomFloorOffset;
     if(coastal&&state.player.belowDeck&&inHold(x,z)&&!atStairs(x,z)) return marigold.hold;
     return terrainHeight(x,z);
   }
@@ -537,11 +630,20 @@ export function createWorld(container,state,callback) {
     if(waterSurface(x,z)!==null||owner!==realm) return true;
     const bounds=geography[realm];
     if(Math.abs(x)>bounds.rx-4||Math.abs(z)>bounds.rz-4) return true;
+    if(walkInRooms.length){
+      // Keep fast movement from skipping over a thin doorway jamb.
+      const start=state.player;
+      const steps=Math.ceil(Math.hypot(x-start.x,z-start.z)/.20);
+      for(let i=1;i<steps;i++){
+        const t=i/steps;
+        if(!clearPath(T.MathUtils.lerp(start.x,x,t),T.MathUtils.lerp(start.z,z,t))) return false;
+      }
+    }
     return clearPath(x,z);
   }
 
   function toggleFlight(){
-    if(!active||paused||building) return;
+    if(!active||paused||building||insideRoom()||homestead?.inside?.(state.player.x,state.player.z)) return;
     if(coastal&&state.player.belowDeck&&!state.transit) return;
     if(state.transit?.mode==='fly'){landing=!landing;return;}
     const owned=state.companions.includes(state.active)&&canFly(species[state.active]);
@@ -563,7 +665,7 @@ export function createWorld(container,state,callback) {
     if(moving) {
       const length=Math.hypot(x,z);
       const boost=keys.has('shift');
-      const speed=(flight?(state.transit.mount?(boost?29:20):(boost?24:16)):swim?(boost?7:5):boost?8.1:5.2)*dt*(state.transit?1:combat.moveMultiplier());
+      const speed=(flight?(state.transit.mount?(boost?29:20):(boost?24:16)):swim?(boost?7:5):insideRoom()?3.55:boost?8.1:5.2)*dt*(state.transit?1:combat.moveMultiplier());
       x=x/length*speed;z=z/length*speed;
       const dx=x*cx+z*sx,dz=-x*sx+z*cx;
       if(tryDirection(p.x+dx,p.z,flight)) p.x+=dx;
@@ -585,9 +687,14 @@ export function createWorld(container,state,callback) {
       if(up) landing=false;
       y+=((up?10.8:0)-(down?9.2:0))*dt;
       const base=surface===null?f:Math.max(surface,f);
+      const buildingBelow=roomAt(p.x,p.z);
+      const rooftop=buildingBelow&&(buildingBelow.kind==='regional'?base+8.6:buildingBelow.stories
+        ?base+2.17+(buildingBelow.stories-1)*2.03+buildingBelow.width*.48+.55:base+22.5);
       if(island!==null&&before>=island-.16&&y<=island+.06&&down){
         y=island;grounded=true;landing=false;state.transit=null;
         if(realm!=='sky') arrived='sky';
+      } else if(buildingBelow&&down&&y<rooftop){
+        y=before;landing=false;state.transit.y=y;
       } else if(y<base+.42){
         y=base+(surface===null?0:-1.24);
         grounded=surface===null;landing=false;
@@ -667,6 +774,37 @@ export function createWorld(container,state,callback) {
   function cameraUpdate(dt,snap=false) {
     const p=state.player;
     const aspect=camera.aspect;
+    const room=insideRoom()??(!building&&!state.transit?homestead?.cameraRoom?.(p.x,p.z):null)??null;
+    if(room!==cameraRoom){
+      cameraRoom=room;
+      camera.layers.set(room?.layer??0);
+      scene.background=room?roomBackdrop:null;
+      renderer.domElement.setAttribute('aria-label',room
+        ?'Cutaway room view. Drag to rotate. Scroll to zoom.'
+        :'3D view. Drag to look around.');
+      roomZoom=aspect<.76?.86:1;
+      snap=true;
+    }
+    if(room){
+      const delta=p.yaw-room.yaw,c=Math.abs(Math.cos(delta)),s=Math.abs(Math.sin(delta));
+      const projectedWidth=room.width*c+room.depth*s;
+      const projectedDepth=room.width*s+room.depth*c;
+      const fit=Math.max(projectedWidth/Math.max(.38,aspect),projectedDepth*.88,room.kind==='homestead'?5.2:0);
+      const distance=(fit*1.06+1.4)*(room.kind==='regional'?1.13:1)*roomZoom;
+      const ground=terrainHeight(room.x,room.z);
+      const tx=T.MathUtils.lerp(room.x,p.x,.13),tz=T.MathUtils.lerp(room.z,p.z,.13);
+      ideal.set(tx+Math.sin(p.yaw)*distance*.38,ground+distance,tz+Math.cos(p.yaw)*distance*.38);
+      camera.position.lerp(ideal,snap?1:1-Math.exp(-dt*12));
+      camera.lookAt(tx,ground+.37,tz);camera.updateMatrixWorld();
+      player.group.visible=true;
+      if(buddy){
+        const gap=Math.hypot(buddy.x-p.x,buddy.z-p.z);
+        buddy.roomHidden=gap<(buddy.roomHidden?1.23:.96);
+        const visible=inRoom(room,buddy.x,buddy.z)&&!buddy.roomHidden;
+        buddy.look.group.visible=visible;buddy.shadow.visible=visible;
+      }
+      return;
+    }
     const inFlight=state.transit?.mode==='fly';
     const shipInterior=coastal&&(p.belowDeck||atStairs(p.x,p.z))&&y<marigold.deck-.48;
     const interior=!inFlight&&(homestead?.inside?.(p.x,p.z)||shipInterior);
@@ -684,7 +822,7 @@ export function createWorld(container,state,callback) {
     const sx=Math.sin(p.yaw),sz=Math.cos(p.yaw);
     const shoulder=shipInterior?.29:interior?0:building?(aspect<.85?1.05:1.93):fighting?.76+2.15*meleeCamera:0;
     const cityCamera=inSpirehaven(p)&&!building;
-    const structureCamera=(realm==='silvercoast'||cityCamera)&&!building;
+    const structureCamera=(realm==='silvercoast'||cityCamera||walkInRooms.some(room=>Math.hypot(p.x-room.x,p.z-room.z)<22))&&!building;
     let fraction=1;
     if(!inFlight&&(fighting||interior||valley&&!building||structureCamera)){
       for(let i=0;i<=(cityCamera?17:9);i++){
@@ -844,7 +982,37 @@ export function createWorld(container,state,callback) {
     if(!active || paused || building || combat.isFighting() || state.transit?.mode==='fly') return null;
     const p=state.player;
     const distance=(x,z)=>Math.hypot(x-p.x,z-p.z);
+    const room=insideRoom();
+    if(room){
+      const candidates=room.stations.flatMap(station=>{
+        const d=distance(...roomPoint(room,station.x,station.z));
+        if(d>1.18||(station.kind==='dial'&&state.spirehaven.aligned)) return [];
+        const hint=station.kind==='dial'?'Set to '+dialFaces[state.spirehaven.dials[station.id]??0]:station.hint;
+        const completed=station.kind==='activity'&&(state.roomActivities[room.id]??0)===room.activity.steps.length;
+        return [{d,kind:'walk-in-room',room,station,label:station.label,hint:completed?'Completed':hint}];
+      });
+      return candidates.sort((a,b)=>a.d-b.d)[0]??null;
+    }
     const candidates=[];
+    if(ward){
+      const target=course[relayIndex],[x,z]=relayPosts[target];
+      if(distance(x,z)<3)candidates.push({d:-2,kind:'ward-relay',label:relayIndex?'Light the '+relayNames[target].toLowerCase():'Start the lantern run',
+        hint:relayIndex?ward.title:'Light four lanterns in 65 seconds · 10 Suncoins'});
+    }
+    if(state.trails[realm]===2&&newRegions[realm]){
+      const region=newRegions[realm];
+      if(distance(...landmarkPoint(region))<5.4) candidates.push({d:-.9,kind:'trail-landmark',label:'Examine the carvings',hint:region.landmark});
+    }
+    for(const cave of caves){
+      const d=distance(...cavePoints(cave,0,.8));
+      if(d<2) candidates.push({d:d*.24,kind:'dungeon',id:cave.id,label:'Enter '+cave.name,hint:'Explore the underground passages'});
+    }
+    const homeRoom=valley&&propertyArea(p,realm,state.homestead);
+    if(homeRoom&&Object.hasOwn(extensions,homeRoom)){
+      const room=extensions[homeRoom];
+      const d=distance(...homesteadServicePoint(homeRoom));
+      if(d<1.6) candidates.push({d:d*.21,kind:'homestead-room',id:homeRoom,label:room.service,hint:room.name});
+    }
     const loot=nearbyLoot(state,realm);
     if(loot) candidates.push({d:-2,kind:'loot',id:loot.id,label:'Pick up bandit loot',
       hint:[loot.coins?loot.coins+' Suncoins':'',...Object.entries(loot.items).map(([item,count])=>count+'× '+items[item]?.[0])].filter(Boolean).join(' · ')});
@@ -865,7 +1033,7 @@ export function createWorld(container,state,callback) {
     const cache=callback.cacheAt?.(p,realm);
     if(cache) candidates.push({d:-1,...cache});
     const station=townServiceAt(realm,p.x,p.z,2.25);
-    if(station) candidates.push({d:.24+distance(station.x,station.z)*.24,
+    if(station&&!regionalRoomById(station.id)) candidates.push({d:.24+distance(station.x,station.z)*.24,
       kind:'town',id:station.id,label:'Enter '+station.name,hint:'Use this town service'});
     for(const a of agents) {
       const d=distance(a.x,a.z);
@@ -908,7 +1076,7 @@ export function createWorld(container,state,callback) {
     for(const actor of [...agents,...wild]) {
       const wildActor=Boolean(actor.id);
       const d=Math.hypot(actor.x-p.x,actor.z-p.z);
-      if(paused||building||!actor.look.group.visible||d>(wildActor?13:19)){
+      if(paused||building||cameraRoom||!actor.look.group.visible||d>(wildActor?13:19)){
         actor.name.hidden=true;continue;
       }
       v.copy(actor.look.group.position);
@@ -989,7 +1157,7 @@ export function createWorld(container,state,callback) {
     }
     const xx=place.x*GRID,zz=place.z*GRID;
     const below=place.level>0&&blockMap.get(blockKey(place.x,place.z,place.level-1));
-    const valid=place.level>=0&&place.level<=6&&safeGround(xx,zz)&&!(coastal&&onShip(xx,zz))
+    const valid=place.level>=0&&place.level<=6&&safeGround(xx,zz)&&!roomAt(xx,zz)&&!(coastal&&onShip(xx,zz))
       &&(place.level===0||below&&['plank','brick'].includes(below.data.type))
       &&!blockMap.has(blockKey(place.x,place.z,place.level))
       &&Math.hypot(xx-p.x,zz-p.z)>.94
@@ -1042,7 +1210,7 @@ export function createWorld(container,state,callback) {
     const dt=Math.min((ms-lastFrame)/1000,.11)||.016;
     lastFrame=ms;
     if(!paused){
-      elapsed+=dt;
+      elapsed+=dt;updateRelay();
       state.time=(state.time+dt*.038)%24;
       if(movePlayer(dt,elapsed)) return;
       if(!building&&!state.transit&&grounded&&!combat.isFighting()){
@@ -1057,6 +1225,7 @@ export function createWorld(container,state,callback) {
         a.model.visible=!(state.harvested[a.key]>now)&&Math.hypot(p.x-a.x,p.z-a.z)<32;
       }
       cameraUpdate(dt);
+      doorSignals.update(elapsed,p,camera);
       homestead?.update?.();
       combat.update(dt,{actor:player,buddy,camera,eligible:!building&&grounded});
       lootArt.update(elapsed,p,camera,combat.isFighting());
@@ -1070,7 +1239,7 @@ export function createWorld(container,state,callback) {
     if(elapsed-prevSun>.42){prevSun=elapsed;updateLighting();}
     if(elapsed-prevUi>.085||paused){
       prevUi=elapsed;drawLabels();
-      callback.update(interaction(),elapsed,landing);
+      callback.update(interaction(),elapsed,landing,cameraRoom);
     }
     buildPreview();
     renderer.render(scene,camera);
@@ -1137,12 +1306,21 @@ export function createWorld(container,state,callback) {
   },options);
   canvas.addEventListener('pointercancel',()=>{gesture=null;mouseAim=false;},options);
   canvas.addEventListener('pointerleave',()=>{mouseAim=false;combat.aim(null);},options);
+  function zoomRoom(delta){
+    if(cameraRoom) roomZoom=T.MathUtils.clamp(roomZoom+delta,.65,1.35);
+  }
   canvas.addEventListener('wheel',e=>{
-    if(active&&!paused){e.preventDefault();distance=T.MathUtils.clamp(distance+e.deltaY*.009,5.8,17);}
+    if(active&&!paused){
+      e.preventDefault();
+      if(cameraRoom) zoomRoom(e.deltaY*.001);
+      else distance=T.MathUtils.clamp(distance+e.deltaY*.009,5.8,17);
+    }
   },{...options,passive:false});
   return {
     get renderer(){return renderer;},
-    toggleFlight,
+    insideRoom,
+    zoomRoom,
+    toggleFlight,lightLantern,
     combat:combat.action,
     inCombat:combat.isFighting,
     syncTracking,trackingJourney,
@@ -1154,7 +1332,7 @@ export function createWorld(container,state,callback) {
     },
     companionAction,introduceBuddy,scoutNearby,castEffect,collectLoot,studyNearby,takePostcard,propertyPreview,
     destroy(){
-      cancelAnimationFrame(frameId);events.abort();
+      relayHud?.remove();cancelAnimationFrame(frameId);events.abort();
       for(const actor of [...agents,...wild]) actor.name.remove();
       scoutLabel.remove();
       combat.destroy();lootArt.destroy();trail.destroy();

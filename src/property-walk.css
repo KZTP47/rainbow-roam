@@ -23,6 +23,7 @@
 .walk-dpad button:nth-child(2){grid-column:1;grid-row:2}
 .walk-dpad button:nth-child(3){grid-column:2;grid-row:2}
 .walk-dpad button:nth-child(4){grid-column:3;grid-row:2}
+.walk-interaction{display:grid;gap:6px}
 .walk-interaction .small-action{width:100%;justify-content:center}
 @media(max-width:710px){
   .walk-layout{grid-template-columns:minmax(0,1fr);gap:8px}

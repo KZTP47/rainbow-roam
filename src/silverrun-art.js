@@ -1,7 +1,7 @@
 import * as T from 'three';
 import {part} from './models.js';
 import {celMaterial} from './cel.js';
-import {riverCenter,riverLevel,riverWidth,silverrunBridges} from './silverrun.js';
+import {kingfisherBridge,riverCenter,riverLevel,riverWidth,silverrunBridges} from './silverrun.js';
 import {populateSpirehaven} from './spirehaven-art.js';
 
 const cream='#f3dbb9', stone='#d1b6b6', trim='#ad869d', wood='#946761', gold='#efbc6a';
@@ -58,6 +58,25 @@ function river(scene,group,height,waterMaterial){
   for(const z of silverrunBridges){
     const x=riverCenter(z),y=height(x,z);
     part(group,'cube',stone,x,y-.27,z,7.8,.59,3.56);
+    if(z===kingfisherBridge){
+      for(let n=0;n<20;n++) part(group,'cube',n%2?'#bb907a':'#a27969',x+(n-9.5)*.39,y+.026,z,.38,.08,3.45);
+      for(const side of [-1,1]){
+        for(let n=-2;n<=2;n++){
+          const px=x+n*1.89,edge=z+side*1.59;
+          part(group,'cube','#6f5057',px,y+1.37,edge,.17,2.75,.16);
+          part(group,'cube',wood,px+.40,y+2.48,edge,.083,1.21,.09,0,0,.72);
+        }
+        part(group,'cube',wood,x,y+.63,z+side*1.60,7.83,.41,.14);
+        part(group,'cube','#65778f',x,y+3.17,z+side*.92,8.36,.13,2.19,-side*.39);
+        for(let i=1;i<=4;i++) part(group,'cube','#8297a2',x,y+3.52-i*.169,z+side*i*.43,8.41,.078,.077);
+      }
+      part(group,'cube',trim,x,y+3.60,z,8.48,.14,.21);
+      for(const side of [-1,1]){
+        part(group,'diamond',gold,x+side*4.18,y+3.77,z,.15,.23,.15);
+        part(group,'cube',windowGlass,x+side*3.14,y+2.32,z,.18,.29,.19);
+      }
+      continue;
+    }
     for(let n=0;n<18;n++)
       part(group,'cube',n%3?'#d5c2b0':'#e7d3b6',x+(n-8.5)*.43,y+.015,z,.41,.091,3.42);
     for(const side of [-1,1]){
@@ -124,5 +143,5 @@ export function populateSilverrun(group,scene,height,blockers,waterMaterial){
   river(scene,group,height,waterMaterial);
   const city=populateSpirehaven(group,scene,blockers,height);
   const turnMills=mills(group,scene,blockers,height);
-  return time=>{city(time);turnMills(time);};
+  return (time,player,progress)=>{city(time,player,progress);turnMills(time);};
 }

@@ -5,6 +5,10 @@ import {seeded} from './map-data.js';
 import {silverrun,silverrunPlaces,silverrunRegionAt,silverrunResidents,silverrunResources} from './silverrun.js';
 import {silvercoast,silvercoastPlaces,coastRegionAt,coastResidents,coastResources} from './silvercoast.js';
 
+import {wardWorkshops} from './ward-workshops.js';
+import {wards,wardPetPoint} from './city-wards.js';
+import {clearings,trails} from './town-trails.js';
+
 export const homeland='valley';
 
 const quadrants=[[-23,22],[24,22],[24,-23],[-23,-23]];
@@ -88,6 +92,8 @@ export const spells={
 export const atlas={
   valley:{name:'Blossom Valley',entry:'village',tagline:'Home and the original thirteen regions'},
   ...Object.fromEntries(Object.entries(chapters).map(([id,ch])=>[id,{...ch,entry:ch.places[0][0]}])),
+  ...Object.fromEntries(Object.entries(wards).map(([realm,w])=>[realm,{name:w.name,entry:w.place,height:2.2,
+    tagline:'Spirehaven · '+w.landmark,colors:w.colors,food:'berry',material:'wood'}])),
   silverrun,
   silvercoast,
   hogwarts:{name:'Hogwarts',entry:'hogwarts',tagline:'Castle grounds, Great Hall and magical lessons',height:1.65,colors:['#819789','#acbc9e','#7b7e95','#efc47a']}
@@ -97,7 +103,7 @@ export const horizonRegions={};
 export const horizonSpecies={};
 export const horizonWildlife=[];
 export const horizonVillagers=[];
-export const horizonItems={};
+export const horizonItems=Object.fromEntries(Object.values(wardWorkshops).map(({reward:[id,name,icon]})=>[id,[name,icon]]));
 export const horizonRecipes={};
 export const horizonResources={};
 
@@ -116,28 +122,31 @@ for(const [realm,ch] of Object.entries(chapters)){
     const traveler='guide-'+id;
     const companion='pet-'+id;
     const marker=[x+7,z-1];
-    const travel=[x,z+6];
+    const travel=local?.travel??[x,z+6];
+    const questType=local?.task?{item:0,bond:1,stamp:2}[local.task]:index;
     const goal=[
       {item:merch??ch.material,count:3},{bond:companion},{stamp:id},{quests:placeIds.slice(0,3).map(p=>'guide-'+p)}
-    ][index];
+    ][questType];
     const find=[
       'Bring 3 '+(local?.item[1]??ch.supply[0]).toLowerCase()+' to '+npc,
       'Befriend '+animal,
       'Survey the trail marker in '+name,
       'Finish the first three '+ch.name+' stories'
-    ][index];
-    horizonRegions[id]={name,note:theme,x,z,travel,realm,color:ch.colors[index],marker,sky,...(sky?{lift:[0,5,11,4][index]}:{}),...(local?{shop:local.shop}:{})};
+    ][questType];
+    horizonRegions[id]={name,note:theme,x,z,travel,realm,color:ch.colors[index],marker,sky,
+      ...(local?.yaw!==undefined?{yaw:local.yaw}:{}),...(sky?{lift:[0,5,11,4][index]}:{}),...(local?{shop:local.shop}:{})};
     horizonSpecies[companion]={
       name:animal,family:local?.family??theme+' '+kind,kind,color,accent,place:name,
-      favorite:index%2?ch.food:merch??ch.material,trust:index===3?2:1,
+      favorite:local?.favorite??(index%2?ch.food:merch??ch.material),trust:index===3?2:1,
       lore:local?.lore??['It remembers familiar footsteps and comes closer each time.','It likes to wait beside the shore path after a good meal.','You sometimes find tiny marks where it has been playing.','It takes visitors to its favorite part of the valley.'][index]
     };
     horizonWildlife.push([companion,x+5,z+3,1.25,realm]);
     horizonVillagers.push({
-      id:traveler,name:npc,role:theme,x:x-3,z:z-1,realm,region:id,
+      id:traveler,name:npc,role:local?.role??theme,x:x-3,z:z-1,realm,region:id,
       colors:[['#a96e57','#e8ac83','#9b614b','#d9ab91'][index],ch.colors[(index+1)%4],['#52404a','#904b41','#3c384e','#674b47'][index]],
       portrait:{morph:(index+1)%2,style:(index+4)%12,accessory:[0,3,6,4][index],outfit:index===3?3:0},
-      quest,find,goal,reward:{[ch.food]:3,berry:4,...(local&&index>0?{[merch]:2}:{})},intro,done,after:local?.after??done
+      quest,find,goal,reward:{[ch.food]:3,berry:4,...(local&&questType>0?{[merch]:2}:{})},
+      ...(local?.shifts?{shifts:local.shifts}:{}),intro,done,after:local?.after??done
     });
     for(let i=0;i<22;i++){
       const a=(i+.4)*2.39996,r=3.3+i*.39;
@@ -145,6 +154,36 @@ for(const [realm,ch] of Object.entries(chapters)){
       horizonResources[realm].push([type,x+Math.cos(a)*r,z+Math.sin(a)*r]);
     }
   });
+}
+
+horizonWildlife.push(['silkskip',49,15,1.3,'silverrun'],['rollbud',-33,-27.7,1.2,'silverrun'],['pealfoot',29,37,1.15,'silverrun']);
+for(const [realm,w] of Object.entries(wards)){
+  const [id,name,family,color,accent,favorite,lore]=w.pet;
+  horizonRegions[w.place]={name:w.square,realm,x:0,z:8,travel:[-19,12],gate:[-17,14],marker:[2,-13],color:w.colors[0],note:'Spirehaven · '+w.name};
+  horizonResources[realm]=[[favorite,-31,15],['stone',24,-16],['wood',-19,32],['petal',1,-13]];
+  horizonSpecies[id]={name,family,kind:id,color,accent,favorite,lore,trust:2,place:w.square};
+  horizonWildlife.push([id,...wardPetPoint,1.15,realm]);
+  const apprentices={dyeward:['Ada Skein','Silk winder','Counting skeins','Hanging silk','Rolling the dyed cloth'],
+    cooperward:['Birch Hazel','Hoop fitter','Shaping staves','Setting barrel hoops','Counting the casks'],
+    starward:['Lune Vesper','Star recorder','Polishing lenses','Reading the sundial','Charting the stars']};
+  const [apprentice,role,...shifts]=apprentices[realm];
+  horizonVillagers.push({id:'apprentice-'+realm,name:apprentice,realm,region:w.place,role,x:27,z:-17,shifts,
+    colors:['#c69983',w.colors[3],'#604753'],portrait:{style:5},quest:'A snack for '+w.pet[1],goal:{item:favorite,count:2},
+    find:'Bring two '+(favorite==='berry'?'sunberries':'petals'),reward:{treat:2},
+    intro:w.pet[1]+' comes this way before the lamps are lit. Could you spare a snack for it?',
+    done:'Two for the trail! Take these treats for your own companion.',after:'Watch the roadside when you leave the square.'});
+  horizonVillagers.push({id:'keeper-'+realm,name:w.keeper,realm,region:w.place,role:w.trade,x:4,z:9,colors:['#bc8b72',w.colors[2],'#61464c'],
+    shifts:['Opening the workshop','Checking the lanterns','Counting the evening takings'],portrait:{morph:0,style:4,accessory:3,outfit:1},quest:'Light for '+w.square,goal:{stamp:w.place},reward:{berry:3,treat:1},
+    find:'Survey the marker at '+w.landmark,intro:'Follow the avenue to '+w.landmark+'. Check the brass survey mark for our night watch.',
+    done:'The mark is clear. Our lantern runners can follow it after dusk.',after:'Look for the ribboned lanterns along the road. The watch pays for a quick round.'});
+}
+for(const trail of Object.values(trails)) horizonItems[trail.item]=[trail.reward,'sparkles','ochre'];
+for(const [realm,g] of Object.entries(clearings)){
+  horizonRegions[g.id]={name:g.name,note:'Wildflower clearing',x:g.x,z:g.z,travel:[g.x,g.z+3],realm,color:g.flower,marker:[g.x+4,g.z+2]};
+  const id='pet-'+g.id;
+  horizonSpecies[id]={name:g.pet,kind:g.kind,color:g.color,accent:g.accent,place:g.name,family:'Wildflower '+g.kind,favorite:g.food,trust:2,lore:g.lore};
+  horizonWildlife.push([id,g.x+1,g.z,1.2,realm]);
+  horizonResources[realm].push([g.food,g.x-2.8,g.z+1.6]);
 }
 
 for(const [id,island] of Object.entries(skyIslands)){

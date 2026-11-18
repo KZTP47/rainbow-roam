@@ -69,6 +69,17 @@ kbd {display:inline-flex;justify-content:center;align-items:center;font:800 10px
 #intro-hint span {display:flex;align-items:center;gap:4px}
 #intro-hint span kbd:last-child,#intro-hint svg {margin-right:3px}
 #intro-hint.faded {opacity:0}
+.art-icon {display:inline-grid;place-items:center;color:#695377;background:#eee3dc}
+.dungeon-host {position:fixed;inset:0;z-index:30}
+.dungeon-loading {visibility:hidden}
+.dungeon-mode #hud,.dungeon-mode #view {visibility:hidden}
+#adventure-hotbar {position:absolute;left:50%;bottom:calc(var(--edge) * .8 + 66px);transform:translateX(-50%);display:flex;gap:4px;padding:4px;background:#354636ea;color:#fff1d2;border-radius:10px}
+#adventure-hotbar button {position:relative;display:grid;place-items:center;width:35px;height:32px;padding:0;border:1px solid #fff5d955;border-radius:6px;background:#4e6653;color:inherit}
+#adventure-hotbar button:disabled {opacity:.52}
+#adventure-hotbar kbd {position:absolute;top:1px;left:3px;background:none;color:#fff1d2;font-size:9px}
+#adventure-hotbar [data-quick-count] {position:absolute;bottom:0;right:3px;font-size:9px;font-weight:800}
+.menu-open #adventure-hotbar {visibility:hidden}
+.cave-map-pin {position:absolute;left:var(--mx);top:var(--my);transform:translate(-50%,-50%);display:flex;align-items:center;gap:4px;border-radius:6px;padding:3px 5px;background:#60495b;color:#fff3d9;font-size:10px;white-space:nowrap;pointer-events:none}
 #toolbar {position:absolute;bottom:calc(var(--edge) * .79);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:4px;background:#fff7e9f5;padding:5px;border:1px solid #fff8e9;border-radius:16px;box-shadow:0 5px 26px #33422d49}
 #toolbar>i {width:1px;height:30px;background:#e7dac1;margin:0 2px}
 .tool {position:relative;display:flex;align-items:center;flex-direction:column;gap:2px;min-width:59px;border:0;background:transparent;color:#567453;border-radius:10px;padding:6px 6px 4px;transition:background .15s}
@@ -81,7 +92,7 @@ kbd {display:inline-flex;justify-content:center;align-items:center;font:800 10px
 #buddy>span {display:grid;place-items:center;width:29px;height:29px;border-radius:8px;background:color-mix(in srgb,var(--buddy) 44%,#fff9e9);color:#965d72}
 #buddy strong {font:700 14px Fraunces,Georgia,serif}
 #buddy small {font-size:8px}
-#interact {position:absolute;left:50%;bottom:calc(var(--edge) * .8 + 75px);transform:translateX(-50%);display:flex;align-items:center;gap:9px;background:#fff7e9f5;color:#475845;border:1px solid #fff9ed;border-radius:12px;padding:6px 12px 6px 7px;box-shadow:0 3px 13px #2936294a;text-align:left;max-width:min(86vw,320px)}
+#interact {position:absolute;left:50%;bottom:calc(var(--edge) * .8 + 114px);transform:translateX(-50%);display:flex;align-items:center;gap:9px;background:#fff7e9f5;color:#475845;border:1px solid #fff9ed;border-radius:12px;padding:6px 12px 6px 7px;box-shadow:0 3px 13px #2936294a;text-align:left;max-width:min(86vw,320px)}
 #interact kbd {min-width:29px;height:29px;background:#547456;color:#fff7dd;border-color:#547456}
 #interact strong,#interact small {display:block}
 #interact strong {font:700 14px Fraunces,Georgia,serif}
@@ -181,6 +192,10 @@ kbd {display:inline-flex;justify-content:center;align-items:center;font:800 10px
 .dialog .portrait {background:color-mix(in srgb,var(--portrait) 38%,#fff6df);color:#6b5361}
 .dialog h2 {font-size:24px}
 .dialog>p {margin:11px 0;font-size:14px;line-height:1.47;font-weight:700;color:#5f5847}
+.dialog .dialog-note {border-left:3px solid #c29d66;padding-left:10px}
+.dialog-choices {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,195px),1fr));gap:6px;margin:12px 0}
+.dialog-choices .primary {min-height:42px;justify-content:flex-start;text-align:left;font-size:12px}
+.dialog:has(.dialog-choices) {max-height:calc(100dvh - var(--edge) - 78px);overflow:auto}
 .dialog-actions {display:flex;justify-content:flex-end}
 .dialog-actions .primary {padding:7px 11px;font-size:12px}
 .game-alert {position:absolute;z-index:5;top:10px;left:50%;transform:translateX(-50%);padding:9px 14px;border-radius:8px;background:#fff4e9;color:#8c4151;font-weight:800;text-align:center}
@@ -231,6 +246,8 @@ kbd {display:inline-flex;justify-content:center;align-items:center;font:800 10px
   #buddy>span {width:21px;height:21px}
   #buddy strong {font-size:11px}
   #interact {bottom:calc(128px + env(safe-area-inset-bottom));gap:5px;padding:5px 8px 5px 5px}
+  #adventure-hotbar {bottom:calc(86px + env(safe-area-inset-bottom))}
+  #adventure-hotbar button {width:30px;height:29px}
   #interact kbd {min-width:22px;height:22px}
   #interact strong {font-size:12px}
   #toast-stack {top:88px;max-width:52vw}
@@ -344,11 +361,15 @@ kbd {display:inline-flex;justify-content:center;align-items:center;font:800 10px
   .world-chart button {min-width:63px;max-width:86px;padding:2px 4px}
 }
 #flight-button {position:absolute;right:var(--edge);bottom:calc(163px + env(safe-area-inset-bottom));box-shadow:0 3px 12px #4b3e5438}
+#room-camera {position:absolute;right:var(--edge);bottom:calc(163px + env(safe-area-inset-bottom));display:grid;gap:6px}
+#room-camera .round {width:36px;height:36px;font-size:1.25rem}
+.menu-open #room-camera {visibility:hidden}
 #flight-status {position:absolute;left:50%;transform:translateX(-50%);bottom:calc(93px + env(safe-area-inset-bottom));display:grid;text-align:center;gap:2px;padding:8px 13px;border-radius:12px;background:#fff7e8e8;color:#574661;pointer-events:none}
 #flight-status small,#flight-status em {font-size:11px;font-style:normal}
 .menu-open #flight-button,.menu-open #flight-status {visibility:hidden}
 @media(pointer:coarse),(max-width:670px) {
   #flight-button {bottom:calc(197px + env(safe-area-inset-bottom))}
+  #room-camera {bottom:calc(197px + env(safe-area-inset-bottom))}
   #flight-status {bottom:calc(130px + env(safe-area-inset-bottom));max-width:61vw}
   #flight-status em {display:none}
 }
@@ -377,3 +398,12 @@ kbd {display:inline-flex;justify-content:center;align-items:center;font:800 10px
 .session-wait h1 { margin:0; font:600 clamp(36px,8vw,66px)/1.1 Fraunces,Georgia,serif; }
 .session-wait p { max-width:32rem; margin:18px auto 0; font-size:1rem; line-height:1.6; }
 
+
+#toolbar .hotbar-grip,#adventure-hotbar .hotbar-grip,.underground-hotbar .hotbar-grip {
+  touch-action:none;cursor:grab;pointer-events:auto;flex:0 0 20px;min-width:20px;width:20px;
+  align-self:stretch;display:grid;place-items:center;color:inherit;background:transparent;
+  border:0;padding:0;font:700 18px/1 sans-serif;
+}
+.hotbar-grip:active {cursor:grabbing}
+
+.lantern-race{position:absolute;left:50%;top:16%;transform:translateX(-50%);border-radius:1em;background:#3f4352ed;color:#fff1bc;padding:.45em .8em;pointer-events:none;font-weight:700;text-align:center}.lantern-race[hidden]{display:none}

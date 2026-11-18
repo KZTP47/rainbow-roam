@@ -1,0 +1,39 @@
+// Cell order of the reviewed portrait sheets. New entries without a cell use their icon.
+export const portraitIds={
+  item:[
+    'spore','silk','bell','shell','honey','ribbon','jade','glow',
+    'mooncake','nougat','cloudcake','pearlsnack','silkwrap','glowtea','kitebiscuit','jadejelly',
+    'stoolpet','mushroomlamp','windchime','shellmosaic','honeybox','pennant','springpot','moonjar',
+    'heath-base','heath-bake','heatherpost-merch','kettlefen-merch','shepherdsteps-merch','rainradio-merch','cinder-base','cinder-bake',
+    'embercross-merch','coalcanal-merch','cinderpines-merch','firewatch-merch','reef-base','reef-bake','pearlbreak-merch','abalone-merch',
+    'fancliff-merch','starfoam-merch','verdigris-base','verdigris-bake','bellfoundry-merch','silvertarn-merch','briarwatch-merch','brasshaven-merch',
+    'orchards-base','orchards-bake','tumblepress-merch','bramblefair-merch','seventrees-merch','harveststage-merch','bellport-base','bellport-bake',
+    'bellwharf-merch','skerrylight-merch','fennel-base','fennel-bake','fennelsquare-merch','chalkgate-merch','gloam-base','gloam-bake',
+    'gloamcross-merch','violethollow-merch','linen-base','linen-bake','linnetloom-merch','dyepond-merch','larkspur-base','larkspur-bake',
+    'larkmarket-merch','bluecleft-merch','tamarack-base','tamarack-bake','tamarackgreen-merch','kettlelake-merch','windmere-base','windmere-bake',
+    'windmerequay-merch','oatcliff-merch','safflower-base','safflower-bake','safflowergate-merch','rosecut-merch','seabloom-base','seabloom-bake',
+    'seabloomstrand-merch','coralshelf-merch','amberfen-base','amberfen-bake','amberfenlock-merch','sedgeglass-merch','salt','saltcrisp',
+    'caplace','woodcake','rime','rimepop','ochregrass','sunwafer','reedpearl','lotusroll',
+    'skyfloss','skymeringue','auroraQuartz','lanternSeed','sunspunGlass','mistPearl','silkQuill','jadeBell',
+    'cloverSeed','carrotSeed','strawberrySeed','sweetClover','honeyCarrot','cloudberry','patchRug','moonLamp',
+    'herbShelf','cloudBed','trailMapScrap','picnicBun','berryCompote','honeyStew','wood','stone',
+    'petal','berry','crystal','treat','charm','plank','brick','fence',
+    'lantern','planter','roof','stool'
+  ],
+  field:[
+    'pearly','dawn','nebula','mint','peach','moss','ember','ripple',
+    'dew','thimble','button','bramble','ochre','velvet','acorn','drift',
+    'cirrus','puffin','whistle','pebble','frill','marble','bumbles','toast',
+    'tawny','zig','bobbin','tassel','pearljade','mottle','dewdrake','jar',
+    'hush','lune','pet-heatherpost','pet-kettlefen','pet-shepherdsteps','pet-rainradio','pet-embercross','pet-coalcanal',
+    'pet-cinderpines','pet-firewatch','pet-pearlbreak','pet-abalone','pet-fancliff','pet-starfoam','pet-bellfoundry','pet-silvertarn',
+    'pet-briarwatch','pet-brasshaven','pet-tumblepress','pet-bramblefair','pet-seventrees','pet-harveststage','pet-bellwharf','pet-skerrylight',
+    'pet-fennelsquare','pet-chalkgate','pet-gloamcross','pet-violethollow','pet-linnetloom','pet-dyepond','pet-larkmarket','pet-bluecleft',
+    'pet-tamarackgreen','pet-kettlelake','pet-windmerequay','pet-oatcliff','pet-safflowergate','pet-rosecut','pet-seabloomstrand','pet-coralshelf',
+    'pet-amberfenlock','pet-sedgeglass','pet-brine','pet-scallop','pet-glass','pet-lanternkey','pet-books','pet-hazel',
+    'pet-fallen','pet-canopy','pet-sled','pet-opal','pet-aurora','pet-winterglass','pet-caravan','pet-arches',
+    'pet-cactus','pet-sunwell','pet-ink','pet-lotus','pet-stones','pet-song','pet-sail','pet-waterveil',
+    'pet-orchid','pet-moonrise','pet-auroraglass','pet-lanternroot','pet-sunspindle','pet-pearlfoam','pet-owlpost','pet-jadegale',
+    'hedwig'
+  ]
+};

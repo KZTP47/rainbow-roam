@@ -1,4 +1,6 @@
+import {wards} from './city-wards.js';
 import {skyOrigin,skyIslands,skyRim} from './sky-islands.js';
+import {newRealmLayouts} from './new-regions.js';
 
 export const oceanLevel=.43;
 export const worldBounds=569;
@@ -31,8 +33,10 @@ export const geography={
   delta:{x:155,z:118,rx:59,rz:59,title:'Lotus Delta',tone:'#87ad98'},
   ...frontierLayout,
   ...townRealmLayout,
+  ...Object.fromEntries(Object.entries(wards).map(([id,w])=>[id,{x:w.x,z:391,rx:59,rz:59,title:w.name,tone:w.colors[0]}])),
   silverrun:{x:0,z:391,rx:59,rz:59,title:'Silverrun',tone:'#aab987'},
   silvercoast:{x:0,z:509,rx:59,rz:59,title:'Silverrun Coast',tone:'#c2bb91'},
+  ...newRealmLayouts,
   sky:{...skyOrigin,rx:Math.ceil(Math.max(...Object.values(skyIslands).map(i=>Math.abs(i.world[0]-skyOrigin.x)))+skyRim+8),
     rz:Math.ceil(Math.max(...Object.values(skyIslands).map(i=>Math.abs(i.world[1]-skyOrigin.z)))+skyRim+8),title:'The Aerie',tone:'#a4b2c6'}
 };

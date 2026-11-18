@@ -1,3 +1,5 @@
+import {wardWorkshops} from './ward-workshops.js';
+import {movableHotbar} from './hotbar-layout.js';
 import {icon} from './icons.js';
 import {items, recipes, species, villagers, regions, regionAt, canAfford, questReady} from './content.js';
 import {wardrobe} from './wardrobe.js';
@@ -13,6 +15,8 @@ import {mountPropertyWalk,resetPropertyWalk} from './property-walk.js';
 import {trackingText,trackingRegion} from './item-tracking.js';
 import {trackingSelection} from './quest-tracking.js';
 import {kitchen} from './town-life.js';
+import {portraitIds} from './portrait-ids.js';
+import {dungeonEntrances} from './dungeons.js';
 
 const panels={
   journal:['book','Quest journal','Find leads and track active quests'],
@@ -29,12 +33,17 @@ const panels={
   settings:['settings','Settings','Make yourself at home'],
   market:['bag','Market','Buy supplies or sell your harvest'],
   homestead:['house','Clover Cottage','Your cottage and kitchen garden'],
+  wizardTower:['sparkles','Wizard Tower','Travel to a tower you’ve built underground'],
   activities:['house','Town life','Services, discoveries and traveling tools'],
   bounties:['compass','Ranger bounty board','Keep the trails safe for your friends']
 };
 const nav=[['bag','Bag','I'],['companions','Friends','C'],['craft','Craft','K'],['journal','Journal','J'],['map','Map','M']];
+const quickSlots=[['attack','Strike','sword'],['bow','Bow','bow'],['dodge','Dodge','wind'],['potion','Heartleaf potion','heart']];
 const itemIcon=(id)=>icon(items[id][1]);
-const pictureSets={item:Object.keys(items),field:Object.keys(species),wanted:BANDITS.map(b=>b.id)};
+const pictureSets={...portraitIds,wanted:BANDITS.map(b=>b.id)};
+const newFriendIds=['dewbutton','pet-frostfern','pet-emberbells','pet-starcups','silkskip','rollbud','pealfoot'];
+const friendPictures=typeof __ROAM_NEW_FRIENDS__==='string'
+  ?__ROAM_NEW_FRIENDS__:new URL(import.meta.env.BASE_URL+'new-friends.webp',document.baseURI).href;
 const fieldPictures=typeof __ROAM_FIELD_PICTURES__==='string'
   ?__ROAM_FIELD_PICTURES__:new URL(import.meta.env.BASE_URL+'field-portraits.webp',document.baseURI).href;
 const itemPictures=typeof __ROAM_ITEM_PICTURES__==='string'
@@ -44,7 +53,13 @@ const wantedPictures=typeof __ROAM_WANTED_PICTURES__==='string'
   ?__ROAM_WANTED_PICTURES__:new URL(import.meta.env.BASE_URL+'wanted-portraits.webp',document.baseURI).href;
 
 function portrait(id,set,extra=''){
+  const friendIndex=set==='field'?newFriendIds.indexOf(id):-1;
+  if(friendIndex>=0) return `<span class="art-tile field-art ${extra}" aria-hidden="true" style="background-image:var(--new-friends);--art-c:${newFriendIds.length*100}%;--art-r:100%;--art-x:${friendIndex/(newFriendIds.length-1)*100}%;--art-y:0%"></span>`;
   const index=pictureSets[set].indexOf(id), columns=8;
+  if(index<0){
+    const symbol=set==='item'?items[id]?.[1]??'bag':species[id]?.reefIcon??'paw';
+    return `<span class="art-tile art-icon ${extra}" aria-hidden="true">${icon(symbol,24)}</span>`;
+  }
   const rows=Math.ceil(pictureSets[set].length/columns);
   const x=index%columns/(columns-1)*100,y=Math.floor(index/columns)/(rows-1)*100;
   return `<span class="art-tile ${set}-art ${extra}" aria-hidden="true"
@@ -54,6 +69,8 @@ function portrait(id,set,extra=''){
 const cover = typeof __ROAM_OFFLINE_COVER__ === 'string'
   ? __ROAM_OFFLINE_COVER__
   : import.meta.env.BASE_URL + 'roam-cover.webp';
+
+import {trails,friendHabitats} from './town-trails.js';
 
 function logo() {
   return `<span class="brand-mark"><i></i><i></i><i></i>${icon('sparkle',13)}</span>`;
@@ -69,6 +86,7 @@ function trackItem(id){
 }
 
 export function createUI(root, state, actions, hasSave) {
+  root.style.setProperty('--new-friends','url("'+friendPictures+'")');
   root.style.setProperty('--field-pictures','url("'+fieldPictures+'")');
   root.style.setProperty('--item-pictures','url("'+itemPictures+'")');
   root.style.setProperty('--wanted-pictures','url("'+wantedPictures+'")');
@@ -106,9 +124,17 @@ export function createUI(root, state, actions, hasSave) {
       <div id="world-labels" aria-hidden="true"></div>
       <div id="toast-stack" aria-live="polite"></div>
       <button id="interact" data-action="interact" hidden></button>
+      <div id="adventure-hotbar" role="group" aria-label="Adventure hotbar">
+        ${quickSlots.map(([id,label,symbol],index)=>`<button type="button" data-action="quick-slot:${id}" data-quick="${id}"
+          aria-label="${label}" title="${label} (${index+1})"><kbd>${index+1}</kbd>${icon(symbol,17)}${id==='potion'?'<span data-quick-count></span>':''}</button>`).join('')}
+      </div>
       <div id="flight-status" hidden></div>
       <div id="item-trail-status" hidden></div>
       <button id="flight-button" data-action="flight" class="round" aria-label="Take flight" title="Take flight (F)">${icon('rainbow',20)}</button>
+      <div id="room-camera" role="group" aria-label="Room camera" hidden>
+        <button class="round" data-action="room-zoom:in" aria-label="Zoom room in" title="Zoom in">${icon('plus',17)}</button>
+        <button class="round" data-action="room-zoom:out" aria-label="Zoom room out" title="Zoom out"><span aria-hidden="true">−</span></button>
+      </div>
       <div id="build-tip" hidden></div><div id="reticle" hidden></div>
       <div class="touch-controls" id="touch-controls">
         <div class="dpad" aria-label="Movement">
@@ -144,6 +170,8 @@ export function createUI(root, state, actions, hasSave) {
   let trackedMapSource=null;
   let mapTab='world',mapRealm=state.realm,mapPlace=null,craftTab='all',wardrobeTab='appearance',portraitView='full';
   const outfitSections={appearance:['morph','skin','eyes','beard'],hair:['style','hair'],clothes:['outfit','coat','accessory']};
+  movableHotbar(el('toolbar'),'tools');
+  movableHotbar(el('adventure-hotbar'),'adventure');
   const controls=[['W A S D','Move'],['Drag mouse','Look around'],['Shift','Run'],['Space','Jump'],['E','Talk, gather or offer a treat'],['B','Toggle build mode'],['Left click','Place in build mode or strike in combat'],['Right click','Retrieve a building piece or lock on in combat'],['R','Rotate a building piece'],['1–7','Select a building piece'],['I / C / K / J / M','Bag / Friends / Craft / Journal / Map'],['V / P / T','Voyage atlas / Companion care / Spellbook'],['L / U / Y / N','Market / Homestead / Bounties / Town life'],['Z / H / Q','Strike / Bow / Lock target'],['Hold G / X','Guard / Dodge on land'],['Esc','Close the current panel']];
 
   function sound() {
@@ -225,6 +253,13 @@ export function createUI(root, state, actions, hasSave) {
     const visible=villagers.filter(v=>journalScope==='all'||(journalScope==='active'?
       state.quests[v.id]==='active':(v.realm??homeland)===state.realm));
     const finished=Object.values(state.quests).filter(x=>x==='done').length;
+    const commissions=Object.values(wardWorkshops).filter(room=>{
+      const n=state.roomActivities[room.id]??0;
+      return journalScope==='all'||(journalScope==='active'?n>0&&n<room.activity.steps.length:room.realm===state.realm);
+    }).map(room=>{
+      const n=state.roomActivities[room.id]??0;
+      return `<article class="journal-entry folio-story"><span class="story-mark">${room.name} · ${n}/${room.activity.steps.length}</span><div><strong>${room.activity.title}</strong><p>${room.activity.directions[n]??'Completed · '+room.reward[1]}</p></div></article>`;
+    }).join('');
     const chapter=atlas[state.realm],color=chapter.colors?.[0]??'#a9bb8e';
     return `<div class="folio-feature journal-cover" style="--chapter:${color}">
       <span class="chapter-illustration" aria-hidden="true">${icon(chapterIcon[state.realm],40)}</span>
@@ -232,7 +267,10 @@ export function createUI(root, state, actions, hasSave) {
       ${action('View map','map','map','','small-action')}</div>
       <div class="tab-row folio-tabs">${[['active','Active quests'],['current','This expedition'],['all','All stories']].map(([id,label])=>
       `<button data-action="journal-scope:${id}" aria-pressed="${journalScope===id}">${label}</button>`).join('')}</div>
-      <div class="journal-list folio-grid">${visible.map(v=>{
+      <div class="journal-list folio-grid">${commissions}${Object.entries(trails).filter(([realm])=>journalScope==='all'||(journalScope==='active'?state.trails[realm]>0&&state.trails[realm]<5:realm===state.realm)).map(([realm,trail])=>{
+        const stage=state.trails[realm]??0;
+        return `<article class="journal-entry folio-story"><span class="story-mark">${atlas[realm].name} · ${stage}/5</span><div><strong>${trail.title}</strong><p>${trail.directions[stage]??'Completed · '+trail.reward}</p></div></article>`;
+      }).join('')}${visible.map(v=>{
       const status=state.quests[v.id],ready=status==='active'&&questReady(v,state);
       const realm=v.realm??homeland,place=regions[v.region??regionAt(v.x,v.z,realm)];
       const rewards=Object.keys(v.reward).filter(id=>Object.hasOwn(items,id));
@@ -247,14 +285,14 @@ export function createUI(root, state, actions, hasSave) {
        ${status==='active'&&goalItem?`<span class="item-story-reward" title="Required: ${items[goalItem]?.[0]}">${itemBadge(goalItem)}${trackItem(goalItem)}</span>`:''}
        ${status!=='done'?`<button data-action="${selected?'clear-quest-track':'track-quest:'+v.id}" class="track" aria-label="${selected?'Stop tracking ':'Track '}${v.quest}" aria-pressed="${selected}">${icon(selected?'x':'sparkles',16)} <span>${selected?'Stop tracking':'Track'}</span></button>`:''}</div>
       </article>`;
-    }).join('')||'<p class="folio-empty">No active quests. Check this expedition for someone to meet.</p>'}</div>`;
+    }).join('')||(!commissions?'<p class="folio-empty">No active quests. Check this expedition for someone to meet.</p>':'')}</div>`;
   }
 
-  let friendFilter='local';
+  let friendFilter='new';
   function companions() {
-    const filters=[['local','Nearby'],['bonded','Befriended'],['all','All creatures']];
+    const filters=[['new','New friends'],['local','Nearby'],['bonded','Befriended'],['all','All creatures']];
     const roster=Object.entries(species).filter(([id,spec])=>
-      friendFilter==='all'||(friendFilter==='local'?spec.place===regions[regionKey]?.name:state.companions.includes(id))
+      friendFilter==='all'||(friendFilter==='new'?spec.reefIcon||Object.hasOwn(friendHabitats,id):friendFilter==='local'?spec.place===regions[regionKey]?.name:state.companions.includes(id))
     );
     const active=state.active&&species[state.active];
     return `<div class="folio-feature field-guide-feature">
@@ -271,6 +309,7 @@ export function createUI(root, state, actions, hasSave) {
         <div class="friend-description"><strong>${spec.name}</strong><small>${spec.family} · ${spec.place}</small>
         ${befriended?`<p>${spec.lore}</p>`:`<p class="offering">${portrait(spec.favorite,'item','ingredient-art')}
           Likes ${items[spec.favorite][0].toLowerCase()} · ${spec.trust} ${spec.trust===1?'offering':'offerings'} ${trackItem(spec.favorite)}</p>`}
+        ${!befriended&&Object.hasOwn(friendHabitats,id)?action('Visit '+spec.place,'visit-friend:'+id,'map','','small-action'):''}
         ${missing?'<strong class="missing-friend">Missing · See the bounty board</strong>':away?'<strong>Out foraging · Check expeditions</strong>':befriended?`<div class="companion-actions"><button data-action="buddy:${id}" class="small-action companion-button" aria-label="${state.active===id?'Send to rest':'Roam together'}">${icon(state.active===id?'moon':'paw',14)} ${state.active===id?'Rest':'Roam'}</button>
           <button data-action="care-for:${id}" class="small-action" aria-label="Care for ${spec.name}">${icon('heart',14)} Care</button></div>`:''}</div></article>`;
     }).join('')||'<p class="folio-empty">No creatures are listed here. Try a different tab or explore another place.</p>'}</div>`;
@@ -326,6 +365,10 @@ export function createUI(root, state, actions, hasSave) {
       <div class="regional-map">
         <canvas id="bigmap" width="1050" height="660" aria-label="Map of ${title}"></canvas>
         ${mapItemRoute(journey,tracking,mapRealm,mapPlace)}
+        ${dungeonEntrances.filter(cave=>cave.realm===mapRealm&&(!mapPlace||regionAt(cave.x,cave.z,mapRealm)===mapPlace)).map(cave=>{
+          const pin=mapPinStyle(mapRealm,cave,mapPlace);
+          return `<span class="cave-map-pin" style="--mx:${pin.x}%;--my:${pin.y}%" title="${cave.name}">${icon('mountain',15)}<span>${cave.name}</span></span>`;
+        }).join('')}
         ${!mapPlace&&mapRealm!=='hogwarts'?local.map(([id,r])=>{
           const pin=mapPinStyle(mapRealm,r,null);
           return `<button class="regional-pin" data-action="inspect-place:${id}" title="View map of ${r.name}" aria-label="View map of ${r.name}"
@@ -399,9 +442,9 @@ export function createUI(root, state, actions, hasSave) {
   }
 
   function dressingRoom() {
-    const teddy=state.look.morph===3,angel=state.look.morph===2;
-    const tabs=[['appearance','Features'],...(teddy?[]:[['hair','Hair']]),['clothes','Outfit']];
-    const sections=teddy?{appearance:['morph','fur','ears'],clothes:['toy','coat']}:angel
+    const alien=state.look.morph===4,teddy=state.look.morph===3,angel=state.look.morph===2;
+    const tabs=[['appearance','Features'],...(teddy||alien?[]:[['hair','Hair']]),['clothes','Outfit']];
+    const sections=state.look.morph===5?{appearance:['morph','skin','eyes','scales'],hair:['style','hair'],clothes:['coat','accessory']}:alien?{appearance:['morph','glowSkin','eyes'],clothes:['coat']}:teddy?{appearance:['morph','fur','ears'],clothes:['toy','coat']}:angel
       ? {...outfitSections,appearance:['morph','skin','eyes','wingShape'],clothes:['outfit','coat','feather','halo']}
       : outfitSections;
     const visible=sections[wardrobeTab]??sections.appearance;
@@ -428,6 +471,15 @@ export function createUI(root, state, actions, hasSave) {
       </div>`;
   }
 
+  function wizardTower(){
+    const linked=dungeonEntrances.filter(cave=>state.dungeons.towers[cave.id]);
+    return linked.length?`<div class="atlas-list">${linked.map(cave=>`
+      <button data-action="wizard-travel:${cave.id}" style="--realm:#c5b4e4">
+        <span>${icon('sparkles',19)}</span><div><strong>${cave.name}</strong><small>Linked dungeon tower</small></div>${icon('arrow-right',17)}
+      </button>`).join('')}</div>`
+      :'<p class="muted">Find a tower foundation underground. Build a Wizard Tower there to link it to Clover Cottage.</p>';
+  }
+
   function settings() {
     return `<div class="settings-actions">${action('Save progress','save','cloud-check','','small-action')}
       ${action(state.sound?'Mute sound':'Enable sound','sound',state.sound?'volume':'mute','','small-action')}
@@ -443,7 +495,7 @@ export function createUI(root, state, actions, hasSave) {
   }
 
   const views={...frontier.views,activities:()=>town.render(),craft:crafting,journal,companions,map,wardrobe:dressingRoom,settings,
-    atlas:voyageAtlas,care:companionCare,sorting,spells:spellbook,time:timeOfDay};
+    atlas:voyageAtlas,care:companionCare,sorting,spells:spellbook,time:timeOfDay,wizardTower};
   function refresh() {
     objective(); activeBuddy(); sound();
     if(opened) drawPanel();
@@ -486,16 +538,18 @@ export function createUI(root, state, actions, hasSave) {
     const expansionOpen=opened==='homestead'&&overlay.querySelector('.property-expansion')?.open;
     const focused=overlay.contains(document.activeElement)?document.activeElement.dataset.action:null;
     if(opened==='dialog') {
-      const {npc,text,button,command,topic}=detail;
+      const {npc,text,button,command,topic,note,choices}=detail;
       overlay.className='dialog-overlay';
       overlay.innerHTML=`<section role="dialog" aria-modal="true" aria-labelledby="dialog-title" class="dialog">
         <div class="dialog-head"><span class="portrait" style="--portrait:${npc.colors[1]}">${icon('message-circle',24)}</span>
         <div><small>${npc.role}</small><h2 id="dialog-title">${npc.name}</h2></div>
         <button class="round close" data-action="close" aria-label="Close dialogue">${icon('x',21)}</button></div>
-        <p>${text}</p><div class="dialog-actions">
+        <p>${text}</p>${note?`<p class="dialog-note">${note}</p>`:''}
+        ${choices?`<div class="dialog-choices">${choices.map(({label,command})=>action(label,command,null)).join('')}</div>`:''}
+        <div class="dialog-actions">
           ${npc.goal?.item&&state.quests[npc.id]!=='done'?trackItem(npc.goal.item):''}
           ${topic?action(topic,'npc-topic:'+npc.id,'book','','small-action'):''}
-          ${action(button,command,'arrow-right')}</div></section>`;
+          ${action(button,command,choices?null:'arrow-right','',choices?'small-action':'primary')}</div></section>`;
       return;
     }
     const [symbol,title,subtitle]=panels[opened];
@@ -526,6 +580,7 @@ export function createUI(root, state, actions, hasSave) {
   }
 
   function renderBuild(building, valid) {
+    el('adventure-hotbar').hidden=building;
     el('build-tip').hidden=!building; el('reticle').hidden=!building;
     el('toolbar').classList.toggle('build-active',building);
     const touch=el('touch-controls');
@@ -655,16 +710,22 @@ export function createUI(root, state, actions, hasSave) {
       if(!active) el('start').firstElementChild.textContent='Continue roaming';
       if(active) setTimeout(()=>el('intro-hint').classList.add('faded'),20000);
     },
-    saveStatus(ok) {
-      el('save-status').innerHTML=`${icon(ok?'cloud-check':'x',17)}<span>${ok?'Saved':'Save unavailable'}</span>`;
+    saveStatus(saved) {
+      const status=el('save-status');
+      const label=saved==='tab'?'Saved in this tab':saved?'Saved':'Save unavailable';
+      status.title=saved==='tab'?'Progress restores when you reload this tab. Export progress before closing it.'
+        :saved?'Progress saves automatically':'Export progress from Settings to keep a copy.';
+      status.innerHTML=`${icon(saved?'cloud-check':'x',17)}<span>${label}</span>`;
     },
     error(message){
       el('game-alert').hidden=false; el('game-alert').textContent=message;
     },
-    update(region, candidate, clock, now,landing) {
+    update(region, candidate, clock, now,landing,room) {
       const flight=state.transit?.mode==='fly';
       const swimming=state.transit?.mode==='swim';
       const launch=el('flight-button');
+      launch.hidden=Boolean(room);
+      el('room-camera').hidden=!room;
       launch.setAttribute('aria-label',flight?(landing?'Cancel landing':'Land'):'Take flight');
       launch.title=launch.getAttribute('aria-label')+' (F)';
       const cue=el('flight-status');
@@ -694,9 +755,21 @@ export function createUI(root, state, actions, hasSave) {
       document.querySelector('[data-action="jump"]').hidden=Boolean(flight);
       if(regionKey!==region){
         regionKey=region;objective();
-        el('region').textContent=regions[region].name;
-        el('region-note').textContent=regions[region].note;
       }
+      const label=el('region');
+      const place=room?.name??regions[region].name;
+      if(label.textContent!==place){
+        label.textContent=place;
+        el('region-note').textContent=room?.kind==='homestead'?'Inside the homestead':
+          room?'Inside '+(room.town??'Spirehaven'):regions[region].note;
+      }
+      const hotbar=el('adventure-hotbar');
+      const stock=state.inventory.hpPotion??0;
+      const fighting=el('view').classList.contains('combat-in-progress');
+      for(const button of hotbar.querySelectorAll('[data-quick]')){
+        button.disabled=Boolean(state.transit)||(button.dataset.quick==='potion'?stock<1||state.health>=5:!fighting);
+      }
+      hotbar.querySelector('[data-quick-count]').textContent=stock;
       const text=`${String(Math.floor(clock)).padStart(2,'0')}:${String(Math.floor(clock%1*60)).padStart(2,'0')}`;
       if(dateText!==text){
         dateText=text; el('clock').innerHTML=`${icon(clock<6||clock>19?'moon':'sun',17)} ${text}`;

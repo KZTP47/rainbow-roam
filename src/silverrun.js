@@ -1,3 +1,5 @@
+import {rooms,spirehavenRooms} from './spirehaven-rooms.js';
+
 export const silverrun = {
   name:'Silverrun', entry:'spirehaven', tagline:'A walled city, a riverside watermill and windmills on the downs',
   height:2.2, colors:['#9fbd82','#e1d49e','#858aaa','#efb4b9']
@@ -10,8 +12,9 @@ export const silverrunPlaces = {
 };
 
 export const silverrunWalls = {west:-25,east:34,north:-16,south:32};
-export const arcanum={x:20.6,z:-10.6};
-export const silverrunBridges = [-29,14];
+export const arcanum={x:spirehavenRooms.starMap.x,z:spirehavenRooms.starMap.z};
+export const kingfisherBridge = 1;
+export const silverrunBridges = [-29,kingfisherBridge,14];
 export const riverWidth = 2.7;
 export const riverLevel = 1.13;
 export const riverCenter = z => -15+4*Math.sin((z+9)*.04);
@@ -24,8 +27,11 @@ export const silverrunPaths = [
   [[17,14],[14,16],[5,16],[2,14],[-25,14],[-31,19],[-38,20]],
   [[11,38],[31,38],[44,25],[43,-17],[39,-42],[29,-59]],
   [[11,38],[7,48],[11,59]],
-  [[17,14],[37,14],[44,18]],
-  [[17,4],[arcanum.x,3.4],[arcanum.x,-7.05]]
+  [[17,14],[37,14],[44,18],[53,14],[59,14]],
+  [[17,4],[arcanum.x,3.4],[arcanum.x,-7.05]],
+  [[-19,1],[-6.9,1],[-5.7,8],[-5.7,14]],
+  [[17,9],[15.2,8.1],[12,8],[12,2.65]],
+  [[24.5,14],[23.85,11.5],[23.85,7.75],[24.5,5],[25.2,1],[24.6,-3.1],[27.2,-7]]
 ];
 
 export function silverrunRoadDistance(x,z){
@@ -46,7 +52,11 @@ export function roadDistance(paths,x,z){
 export const silverrunLandmarks = {
   spirehaven:[['South Gate',11,32,'hall'],['Griffin Fountain',11,12,'water'],
     ['Arcanum Spire',arcanum.x,arcanum.z,'hall'],['Grand Stair',arcanum.x,1,'hall'],['Clock Tower',26.2,9.55,'hall'],
-    ['Lantern Quay',riverCenter(8)+5,8,'water'],['Old Bridge',riverCenter(14),14,'bridge']],
+    ['Lantern Quay',riverCenter(8)+5,8,'water'],['Old Bridge',riverCenter(14),14,'bridge'],
+    ['Kingfisher Bridge',riverCenter(kingfisherBridge),kingfisherBridge,'bridge'],['Merchants’ Guildhall',12,3.3,'hall'],
+    ['Market Stage',25,20.2,'hall'],['Crooked Tower',30.9,-6.6,'hall'],
+    ['Moonpetal Court',28.15,-8.85,'tree'],['Stargazer Terrace',24.2,-5.25,'hall'],
+    ...rooms.map(({name,x,z})=>[name,x,z,'hall'])],
   millbrook:[['Watermill',-13,-37,'hall'],['Millbrook Bridge',riverCenter(-29),-29,'bridge']],
   windmereDowns:[['Old Lady of Windmere',-43,11,'wind'],['Wheat terraces',-35,31,'tree']]
 };
@@ -74,3 +84,15 @@ export const silverrunResources = [
   ['wood',-9,-42],['stone',-24,-33],['stone',-11,-19],['berry',-29,-38],['petal',-5,-32],
   ['petal',-37,28],['wood',-46,22],['berry',-30,27],['stone',-48,18],['berry',-34,9]
 ];
+
+export const spirehavenCitizens = [
+  ['scribe','Bramble','Guild scribe',12,3,'I keep the guild ledger under the loggia. Look up when you leave. The clock face catches the morning sun.'],
+  ['boatkeeper','Wren','Boatkeeper',-6.55,4.5,'The little roofed bridge is Kingfisher. Cross it when the quay is busy and watch for birds over the water.'],
+  ['gardener','Clover','Moonpetal gardener',27.25,-8.45,'The copper pipes on the Crooked Tower warm our garden wall. Come by at dusk and look for the moonpetals.'],
+  ['stargazer','Lyra','Stargazer',22.65,-3.88,'The brass rings above the stair turn all day. Here on the terrace, we use the little armillary to follow their path.']
+].map(([id,name,role,x,z,intro],index)=>({
+  realm:'silverrun',id:'spirehaven-'+id,name,role,x,z,intro,
+  colors:[['#c88d78','#aa7359','#e0a68b','#bb866e'][index],['#a888b9','#689092','#b77891','#758db8'][index],'#55405a'],
+  shifts:[['Reading','Taking a break','Checking the ledger'],['Checking the moorings','Taking a break','Watching the river'],
+    ['Tending plants','Reading','Tending the window boxes'],['Reading','Taking a break','Watching the spire']][index]
+}));

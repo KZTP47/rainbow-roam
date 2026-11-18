@@ -41,7 +41,7 @@ export function makeAudio(enabled) {
   }
   function play(kind) {
     if(!context || !enabled()) return;
-    const tunes={gather:[72,79],craft:[65,72,76],talk:[69],success:[72,76,79,84],place:[53,60],remove:[61,53],travel:[67,72,79]};
+    const tunes={gather:[72,79],craft:[65,72,76],talk:[69],success:[72,76,79,84],place:[53,60],remove:[61,53],travel:[67,72,79],bellHigh:[84],bellMid:[77],bellLow:[67],doubleChime:[76,76]};
     const t=context.currentTime+.012;
     (tunes[kind]??[72]).forEach((note,i)=>tone(note,t+i*.078,.34+i*.034,.10,i===0&&kind==='place'?'triangle':'sine'));
   }

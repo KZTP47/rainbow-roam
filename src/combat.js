@@ -132,7 +132,8 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
   state.bounties=normalizeBounties(state.bounties);
   state.wallet??={coins:0,badges:0};
   const progress=state.bounties;
-  let active=true,paused=false,enemy=null,lock=false,guard=false,guardHeld=false,stamina=100,hearts=5;
+  let active=true,paused=false,enemy=null,lock=false,guard=false,guardHeld=false,stamina=100;
+  state.health??=5;
   let dodgeTime=0,blockTime=-5,relief=0,t=0,playerArrow=null,enemyArrow=null,regenAt=0;
   let currentMove=null,queued=null,hit=null,steer=null,dodgeHeading=null,aim=null,lastSwing=-5,swingCount=0;
   let tool=null,bow=null,shield=null,camp=null,rescueModel=null,noticeTimer=0,notice='',noticeTone='neutral';
@@ -248,9 +249,9 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
     wind.hidden=!warning;
     if(warning) windFill.style.transform='scaleX('+clamp(1-enemy.wind/enemy.windLength,0,1)+')';
     danger.max=enemy.profile.hearts;danger.value=enemy.hp;
-    const whole=Math.ceil(hearts);
+    const whole=Math.ceil(state.health);
     setText(life,'♥'.repeat(whole)+'♡'.repeat(5-whole));
-    life.setAttribute('aria-label',Math.round(hearts*10)/10+' of five hearts');
+    life.setAttribute('aria-label',Math.round(state.health*10)/10+' of five hearts');
     meter.value=stamina;
     guardButton.setAttribute('aria-pressed',String(guard));
     lockButton.setAttribute('aria-pressed',String(lock));
@@ -416,9 +417,9 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
     }
     if(guard)guard=guardHeld=false;
     currentMove=queued=null;
-    hearts=Math.max(0,hearts-damage);flash(byArrow?'Arrow hit':'Took a hit','danger');
-    if(hearts<=0){
-      clearEnemy();hearts=5;stamina=100;relief=24;progress.raidClock=0;
+    state.health=Math.max(0,state.health-damage);flash(byArrow?'Arrow hit':'Took a hit','danger');
+    if(state.health<=0){
+      clearEnemy();state.health=5;stamina=100;relief=24;progress.raidClock=0;
       say('You caught your breath','Your satchel is safe. You can return to the trail.','heart');
     }
   }
@@ -484,6 +485,12 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
     }
   }
   function action(verb,id){
+    if(verb==='potion'){
+      if(!active||paused||state.transit||state.health>=5||!(state.inventory.hpPotion>0)) return false;
+      state.inventory.hpPotion--;
+      state.health=Math.min(5,state.health+2.5);
+      say('Heartleaf potion','Restored up to two and a half hearts.','heart');hudUpdate();return true;
+    }
     if(verb==='track'){
       if(!isBandit(id)||progress.captured[id]) return false;
       if(enemy?.mode==='bounty'&&enemy.data.id!==id) clearEnemy();
@@ -647,7 +654,7 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
     const previousDodge=dodgeTime;
     dodgeTime=Math.max(0,dodgeTime-dt);
     if(t>regenAt&&!guard&&!currentMove&&dodgeTime<=0)stamina=Math.min(100,stamina+dt*27);
-    if(!enemy)hearts=Math.min(5,hearts+dt*.65);
+    if(!enemy)state.health=Math.min(5,state.health+dt*.65);
     advance(dt,buddy,eligible);
     if(enemy){
       findTool(actor);

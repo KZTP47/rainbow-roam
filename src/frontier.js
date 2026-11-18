@@ -1,5 +1,6 @@
 import {frontierLayout} from './overworld.js';
 import {townChapters,townProfiles} from './town-data.js';
+import {newRegions} from './new-regions.js';
 
 const colorSets={
   heath:['#a2b48f','#d9bbd0','#81768b','#eeeea4'],
@@ -176,4 +177,22 @@ for(const [realm,[tagline,materialName,foodName,entries]] of Object.entries(town
   frontierChapters[realm]={name:profile.title,tagline,height:profile.elevation,colors:profile.palette,material,food,
     supply:[materialName,'sprout','green'],treat:[foodName,'cookie','ochre'],places,
     positions:[profile.center,profile.wilderness]};
+}
+
+for(const region of Object.values(newRegions)){
+  const {id,place,title,name,feature,elevation,palette,center,keeper,pet,stock}=region;
+  const material=id+'-base',food=id+'-bake',item=place+'-merch';
+  frontierPlaces[place]={
+    item:[item,stock.material,stock.icon,'ochre'],lore:pet.lore,
+    shop:name+' Provisioner',family:title+' '+pet.kind,task:keeper.task,role:keeper.role,
+    after:'If you come back at dusk, there’s a good view of '+region.landmark.replace(/^The /,'the ')+' from the road.',
+    shifts:[region.greeting,region.afternoon,region.evening,'Taking a break'],favorite:food,travel:region.arrival,yaw:region.yaw
+  };
+  frontierStores[place]={name:frontierPlaces[place].shop,goods:[[item,6,'coins'],[food,4,'coins'],['berry',3,'coins']]};
+  frontierChapters[id]={
+    name:title,tagline:feature,height:elevation,colors:palette,material,food,
+    supply:[stock.supply,'sprout','green'],treat:[stock.food,'cookie','ochre'],positions:[center],
+    places:[[place,name,keeper.role+' district',keeper.name,keeper.quest,keeper.intro,keeper.done,
+      pet.animal,pet.kind,pet.color,pet.accent]]
+  };
 }

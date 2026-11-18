@@ -1,9 +1,10 @@
 import {atlas} from './horizons.js';
 import {takeBlessing} from './town-life.js';
 import {frontierStores} from './frontier.js';
-import {townServiceAt} from './town-data.js';
+import {regionalRoomAt,regionalRoomById,townServiceAt} from './town-data.js';
 import {items,regionAt,regions} from './content.js';
 import {skyCounterPoint,skyShops} from './sky-islands.js';
+import {spirehavenRoomAt,spirehavenRooms} from './spirehaven-rooms.js';
 
 const physicalStalls={...frontierStores,...skyShops};
 export function marketStalls(realm){
@@ -17,6 +18,13 @@ export function marketStalls(realm){
 import {starterMarket,supplies,currencies,sellPrice} from './homestead.js';
 
 export function marketAtPlace(realmId,place){
+  const room=regionalRoomById(place);
+  if(room?.realm===realmId){
+    const stock=room.service==='inn'?[[atlas[realmId].food,6],['honeyStew',8],['berryCompote',5]]:
+      physicalStalls[room.place].goods;
+    return {name:room.name,goods:stock};
+  }
+  if(realmId==='silverrun'&&Object.hasOwn(spirehavenRooms,place)&&spirehavenRooms[place].goods) return spirehavenRooms[place];
   if(Object.hasOwn(physicalStalls,place)) return physicalStalls[place];
   const realm=atlas[realmId],native=realm.material;
   if(realmId==='valley') return starterMarket;
@@ -35,6 +43,9 @@ export function marketAt(state,atPlace){
 
 export function transact(state,type,id,atPlace){
   if(!Object.hasOwn(items,id)||state.transit) return null;
+  if(regionalRoomById(atPlace)&&regionalRoomAt(state.realm,state.player.x,state.player.z)?.id!==atPlace) return null;
+  if(atPlace&&Object.hasOwn(spirehavenRooms,atPlace)&&
+    (state.realm!=='silverrun'||spirehavenRoomAt(state.player.x,state.player.z)?.id!==atPlace)) return null;
   const inventory=state.inventory;
   if(type==='sell'){
     if(!(inventory[id]>0)) return null;

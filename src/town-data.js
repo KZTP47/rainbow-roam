@@ -1,4 +1,9 @@
 import {townRealmLayout} from './overworld.js';
+import {newRegions} from './new-regions.js';
+import {regionalDesigns} from './regional-designs.js';
+import {buildRegionalInterior} from './regional-interiors.js';
+import {wardWorkshops} from './ward-workshops.js';
+import {inRoom} from './spirehaven-rooms.js';
 
 export const townServiceNames={
   hall:'Town Hall',market:'Market Hall',inn:'Inn',workshop:'Workshop',
@@ -66,9 +71,12 @@ const settlementNames={
   seabloom:['seabloomstrand','Seabloom Strand'],amberfen:['amberfenlock','Amberfen Lock']
 };
 
-export const townProfiles=Object.fromEntries(Object.entries(chapterProfiles).map(([realm,p])=>[
-  realm,{...p,title:townRealmLayout[realm].title,place:settlementNames[realm][0],name:settlementNames[realm][1]}
-]));
+export const townProfiles={
+  ...Object.fromEntries(Object.entries(chapterProfiles).map(([realm,p])=>[
+    realm,{...p,title:townRealmLayout[realm].title,place:settlementNames[realm][0],name:settlementNames[realm][1]}
+  ])),
+  ...newRegions
+};
 
 const legacyCenters=[
   ['valley','village','Petalwick',0,-7,'village','cottage'],
@@ -108,11 +116,29 @@ const petalwickPlan=[
 const legacyPlan=servicePlan.map(([kind,x,z,yaw,w,d])=>
   [kind,x+(x<0?-2:x>0?2:0),z+(z<-11?-2:0),yaw,w,d]);
 
+const newStreets={
+  // The positions correspond to the town services and homes in servicePlan.
+  harbor:[[0,-19],[-11,-13],[11,-18],[17,-5],[18,5],[18,15],[-16,-8],[-17,3],[-16,14],[-8,18],[10,19]],
+  terrace:[[-2,-18],[-13,-16],[11,-12],[16,-8],[18,3],[15,14],[-18,-6],[-15,3],[-18,13],[-8,17],[8,19]],
+  courtyard:[[0,-16],[-12,-15],[11,-18],[15,-6],[16,4],[15,13],[-15,-8],[-17,2],[-15,11],[-9,17],[8,16]],
+  highstreet:[[12,-21],[-12,-20],[13,-13],[12,-5],[14,4],[13,13],[-13,-10],[-13,1],[-14,12],[-9,20],[9,21]],
+  village:[[-5,-18],[-15,-14],[11,-16],[18,-5],[17,7],[13,16],[-19,-6],[-17,5],[-15,14],[-7,18],[7,20]]
+};
+
 function getBuildings(town){
   const {realm,place,center,layout,legacy}=town;
   const plan=realm==='valley'?petalwickPlan:legacy?legacyPlan:servicePlan;
   return plan.map(([kind,x,z,yaw,width,depth],index)=>{
-    if(!legacy){
+    if(town.design){
+      [x,z]=newStreets[layout][index];
+      if(layout==='highstreet'&&(kind==='hall'||kind==='inn')) yaw=-Math.PI/2;
+      if(layout==='highstreet'&&kind==='post') yaw=Math.PI/2;
+      if(kind==='home'){
+        const n=town.design.length+index;
+        width*=.88+(n%3)*.11;
+        depth*=.87+(n%4)*.086;
+      }
+    }else if(!legacy){
       if(layout==='harbor') {x*=1.06;z+=(x<-7?2:x>7?-1:0);}
       if(layout==='terrace') {z+=Math.round(x/7)*1.3;}
       if(layout==='highstreet') {x*=.83;z*=1.09;}
@@ -133,6 +159,35 @@ export const townsByPlace={
   ...Object.fromEntries(Object.entries(townProfiles).map(([realm,profile])=>[profile.place,{...profile,realm}]))
 };
 for(const town of Object.values(townsByPlace)) town.buildings=getBuildings(town);
+
+const regionalRoomList=Object.values(townsByPlace).filter(town=>town.design).flatMap(town=>{
+  const design=regionalDesigns[town.realm];
+  return ['inn','market'].map((kind,index)=>{
+    const {x,z,yaw,width,depth,stop}=town.buildings.find(building=>building.kind===kind);
+    const inn=kind==='inn';
+    const style=inn?'griffin':town.realm==='inkroot'?'bookshop':design.plaza==='pools'?'apothecary':
+      design.plaza==='orchard'||design.plaza==='pots'?'bakery':'wares';
+    const {people,stations,...interior}=buildRegionalInterior(town.realm,width,depth,inn);
+    stations.find(station=>station.kind==='read').hint='A note about '+town.landmark;
+    const [tone,pale,accent]=[town.palette[0],town.palette[1],town.palette[3]];
+    return {id:stop.id,name:inn?design.inn:design.shop,realm:town.realm,place:town.place,kind:'regional',service:kind,
+      town:town.name,landmark:town.landmark,note:design.note,x,z,yaw,width,depth,layer:index+1,style,
+      wall:pale,roof:design.roofColor,rug:design.roofColor,floorStyle:design.walls,joinery:design.wood,...interior,
+      stockTone:tone,stockAccent:accent,stockIcon:town.stock.icon,
+      doorWidth:inn?1.90:2.34,stations,
+      people:people.map(([px,pz],index)=>[px,pz,index?'#d3a381':'#ba8166',index?accent:tone])};
+  });
+});
+regionalRoomList.push(...Object.values(wardWorkshops));
+const regionalRoomIndex=new Map(regionalRoomList.map(room=>[room.id,room]));
+const roomsByRealm=new Map();
+for(const room of regionalRoomList){
+  if(!roomsByRealm.has(room.realm)) roomsByRealm.set(room.realm,[]);
+  roomsByRealm.get(room.realm).push(room);
+}
+export const regionalRoomsFor=realm=>roomsByRealm.get(realm)??[];
+export const regionalRoomById=id=>regionalRoomIndex.get(id);
+export const regionalRoomAt=(realm,x,z)=>regionalRoomsFor(realm).find(room=>inRoom(room,x,z));
 
 export const townServices=Object.values(townsByPlace).flatMap(town=>
   town.buildings.flatMap(b=>b.stop?[b.stop]:[]));
@@ -274,7 +329,9 @@ export const townChapters={
 
 const waterShapes={
   bellport:[2,-7,8.1,5.4],linen:[-2,-7,6.2,3.8],larkspur:[3,-6,5.6,3.55],
-  tamarack:[-1,-7,10.25,6.1],seabloom:[3,-7,7.7,6],amberfen:[-1,-6,8.25,5.55]
+  tamarack:[-1,-7,10.25,6.1],seabloom:[3,-7,7.7,6],amberfen:[-1,-6,8.25,5.55],
+  pearldrift:[-3,-7,9.4,5.9],shellmirror:[5,-6,7,5],reedwatch:[-3,-5,8.4,5.5],
+  saltbanner:[1,-9,7.8,4.75],fernwick:[-1,-6,7.1,4.8]
 };
 export function townWater(realm){
   const shape=waterShapes[realm];
@@ -341,12 +398,14 @@ const neighborEntries=[
 
 export const townResidents=Object.values(townsByPlace).flatMap((town,i)=>{
   const profile=townProfiles[town.realm], local=townServicesForPlace(town.place);
-  return neighborNames[town.place].map((name,j)=>{
+  return (profile?.neighbors??neighborNames[town.place]).map((name,j)=>{
     const k=(i+j*2)%neighborEntries.length;
     const [quest,item,label,intro,done,work]=neighborEntries[k];
     const service=local.find(s=>s.kind===(j?'post':'market'));
-    const sx=town.place==='village'?service.x+(j?.8:-1.35):town.place==='caravan'&&j?-37:service.x+(j?1.8:-3.75);
-    const sz=town.place==='village'?service.z+(j?2.2:.86):town.place==='caravan'&&j?14.9:service.z+(j?2.7:.8);
+    const sx=profile?.design?town.center[0]+(j?8.4:-7.0):
+      town.place==='village'?service.x+(j?.8:-1.35):town.place==='caravan'&&j?-37:service.x+(j?1.8:-3.75);
+    const sz=profile?.design?town.center[1]+(j?8.9:1.7):
+      town.place==='village'?service.z+(j?2.2:.86):town.place==='caravan'&&j?14.9:service.z+(j?2.7:.8);
     return {
       id:'neighbor-'+town.place+'-'+j,name,role:j?'Town caretaker':'Market assistant',realm:town.realm,
       region:town.place,x:sx,z:sz,shifts:[work,profile?.afternoon??'Visiting the square',profile?.evening??'Putting the tools away'],
@@ -369,6 +428,10 @@ export function townPavement(town){
   let runs=[];
   if(town.place==='village') runs=[[7.6,8,1.45,18],[10.1,8.45,9.5,1.55],[-12,20,1.35,9]];
   else if(town.legacy) runs=[[4,-11.8,25,3.7],[13.0,1.1,3.1,23.0],[-13.2,1.2,3.15,22],[0,11.8,25,3.7]];
+  else if(town.design&&style==='harbor') runs=[[1,11.9,29,4.7],[1,1,29,6.8],[-10,-1,3.55,23],[10.7,-1,3.5,23],[0,-8,8.1,17]];
+  else if(town.design&&style==='terrace') runs=[[0,-11.8,22,3.3],[0,-1.9,29,3.95],[-2,8.1,27,3.7],[-7,1,4.2,26],[7.4,-3.7,3.2,22]];
+  else if(town.design&&style==='highstreet') runs=[[0,-1.7,6.8,32],[0,-14,18.1,3.1],[0,4,19.3,3.7],[0,14,17,3.1],[-7.4,-1.45,2.6,21],[7.1,-1.2,2.7,25]];
+  else if(town.design&&style==='village') runs=[[0,7.1,21,3.25],[-.15,2,3.3,26],[-9.7,-.7,2.8,22],[9.95,-.85,2.63,20],[-1,-10.4,18,2.8]];
   else if(style==='harbor') runs=[[0,-8.15,24,3.75],[0,.2,23,4.5],[0,13,30,4.4],[-10.5,1.4,3.22,21],[10.42,2,3.2,22],[0,16,4.1,20]];
   else if(style==='highstreet') runs=[[0,-9,24,3.7],[0,4.0,26,4.2],[0,14.0,23,3.5],[-8.34,3.1,4.25,25],[8.34,3.1,4.25,25],[0,5,4.3,40]];
   else if(style==='courtyard') runs=[[0,-7.3,20,3.35],[0,.0,20,7.6],[0,9.7,22,3.9],[-8.3,2,3.3,17],[8.3,2,3.3,17],[0,16.0,4.5,19.0]];

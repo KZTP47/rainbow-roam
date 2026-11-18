@@ -1,5 +1,5 @@
 
-import {extensions,roomDecor} from './homestead.js';
+import {extensions,roomDecor,roomReady} from './homestead.js';
 import {icon} from './icons.js';
 import {createPropertyAvatar} from './property-avatar.js';
 import {propertySize,propertySpots,projectProperty,propertyViewTitle,propertyBackground,propertySlotLabels} from './property-map.js';
@@ -9,23 +9,30 @@ const sessions=new WeakMap();
 export function resetPropertyWalk(state){sessions.delete(state.homestead);}
 const boxByView={
   house:[.30,.45,7.31,5.84],garden:[.63,.67,7.86,6.57],
-  sunroom:[.34,.43,6.20,5.53],workshop:[.34,.43,6.20,5.53],loft:[.34,.43,6.20,5.53]
+  ...Object.fromEntries(Object.keys(extensions).map(id=>[id,[.34,.43,6.20,5.53]]))
 };
 const obstacles={
   house:[[.16,3.49,.65,5.17],[5.1,.16,6.32,1.05],[3.46,5.65,4.16,6.19],[.92,5.39,1.38,5.95]],
   garden:[[.55,2.77,1.20,3.41],[7.10,.65,7.71,1.29],[6.82,4.79,7.90,5.90]],
   sunroom:[[.24,.51,1.98,1.25],[5.69,4.45,6.42,5.29]],
   workshop:[[.22,.54,1.99,1.49]],
-  loft:[[1.85,.18,3.74,1.02]]
+  loft:[[1.85,.18,3.74,1.02]],
+  kitchen:[[.26,.46,2.66,1.47]],
+  companionNook:[[.28,.48,1.34,1.69],[4.91,.67,6.05,1.65]],
+  wizardTower:[[2.60,.43,3.95,1.19]]
 };
 const entry={
-  house:[3.84,4.83],garden:[4.19,5.91],sunroom:[3.29,4.55],workshop:[3.29,4.55],loft:[3.29,4.55]
+  house:[3.84,4.83],garden:[4.19,5.91],
+  ...Object.fromEntries(Object.keys(extensions).map(id=>[id,[3.29,4.55]]))
 };
 const connectors={
   garden:{point:[3.85,5.50],fromHouse:[4.12,5.89],returnPoint:[4.15,6.39],fromOther:[3.83,4.59]},
   sunroom:{point:[.56,2.90],fromHouse:entry.sunroom,returnPoint:[3.27,5.30],fromOther:[1.66,2.81]},
   workshop:{point:[7.02,2.89],fromHouse:entry.workshop,returnPoint:[3.27,5.30],fromOther:[5.84,2.92]},
-  loft:{point:[3.81,.68],fromHouse:entry.loft,returnPoint:[3.27,5.30],fromOther:[3.84,1.70]}
+  loft:{point:[3.81,.68],fromHouse:entry.loft,returnPoint:[3.27,5.30],fromOther:[3.84,1.70]},
+  kitchen:{point:[7.03,1.39],fromHouse:entry.kitchen,returnPoint:[3.27,5.30],fromOther:[6.09,1.47]},
+  companionNook:{point:[1.81,5.53],fromHouse:entry.companionNook,returnPoint:[3.27,5.30],fromOther:[2.20,4.92]},
+  wizardTower:{point:[7.04,5.63],fromHouse:entry.wizardTower,returnPoint:[3.27,5.30],fromOther:[6.45,5.49]}
 };
 const keyDirection={
   ArrowUp:[-1,-1],KeyW:[-1,-1],ArrowDown:[1,1],KeyS:[1,1],
@@ -136,7 +143,8 @@ export function propertyWalk(state,{action}){
         <p>Use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or arrow keys to move, or select a floor spot. Step onto a doorway to change rooms. <kbd>E</kbd> opens the nearby furnishing spot or bed.</p>
         <div class="walk-dpad" aria-label="Walking controls">${dpad.map(([key,label,symbol])=>
           `<button type="button" data-walk-key="${key}" aria-label="${label}">${icon(symbol,20)}</button>`).join('')}</div>
-        <div class="walk-interaction"><button class="small-action" type="button" data-walk-edit>${icon('armchair',17)} <span>Edit this area</span></button></div>
+        <div class="walk-interaction"><button class="small-action" type="button" data-walk-edit>${icon('armchair',17)} <span>Edit this area</span></button>
+          <button class="small-action" type="button" data-walk-service hidden></button></div>
       </aside>
     </div>
   </section>`;
@@ -155,7 +163,7 @@ export function mountPropertyWalk(host,state,{start='house',edit,renderer}={}){
   const keys=new Set(),presses=new Map();
   const stage=host.querySelector('.walk-stage'),canvas=stage.querySelector('canvas');
   const background=stage.querySelector('img'),portals=stage.querySelector('.walk-portals');
-  const room=host.querySelector('[data-walk-room]'),inspect=host.querySelector('[data-walk-edit]');
+  const room=host.querySelector('[data-walk-room]'),inspect=host.querySelector('[data-walk-edit]'),service=host.querySelector('[data-walk-service]');
   const ctx=canvas.getContext('2d');
   const avatar=createPropertyAvatar(state.look,renderer);
   const controller=new AbortController(),settings={signal:controller.signal};
@@ -178,6 +186,13 @@ export function mountPropertyWalk(host,state,{start='house',edit,renderer}={}){
     background.alt='Isometric walking map of '+propertyViewTitle(view);
     host.dataset.walkArea=view;
     doors=propertyDoorways(home,view);dirty=true;
+    const addition=extensions[view];
+    service.hidden=!addition;
+    if(addition){
+      service.dataset.action='homestead-service:'+view;
+      service.innerHTML=icon(addition.icon,17)+'<span>'+addition.service+'</span>';
+      service.disabled=!roomReady(state,view);
+    }
     portals.innerHTML=doors.map(({to,position})=>{
       const [x,y]=projectProperty(view,...position);
       return '<button type="button" data-walk-door="'+to+'" style="--at-x:'+(x/width*100).toFixed(2)+
@@ -219,6 +234,7 @@ export function mountPropertyWalk(host,state,{start='house',edit,renderer}={}){
   function tick(now){
     const dt=Math.min(.046,last?(now-last)/1000:0);
     last=now;delay=Math.max(0,delay-dt);
+    if(!service.hidden) service.disabled=!roomReady(state,session.view);
     let dx=0,dy=0;
     for(const key of keys){
       dx+=keyDirection[key][0];dy+=keyDirection[key][1];

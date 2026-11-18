@@ -57,6 +57,27 @@ export function creature(spec) {
   const head = new T.Group();
   const tail = new T.Group();
   model.add(head,tail);
+  if(kind==='belljelly'){
+    head.position.y=.84;
+    part(head,'fine',color,0,0,0,.48,.37,.46);
+    part(head,'soft',accent,0,-.15,0,.48,.12,.45);
+    part(head,'fine','#fff3de',-.12,.21,.19,.09,.035,.09,-.5);
+    eyes(head,.16,.01,.40,.065);
+    const frills=[];
+    for(let i=0;i<8;i++){
+      const a=i*Math.PI/4;
+      const x=Math.sin(a)*.30,z=Math.cos(a)*.27;
+      const strand=part(head,'soft',i%2?accent:color,x,-.39,z,.052,.23+(i%2)*.08,.061);
+      frills.push(strand);
+    }
+    const pose=(time,moving)=>{
+      const beat=time*(moving?4.5:2.7),pulse=Math.sin(beat);
+      model.position.y=.26+.14*pulse;
+      head.scale.set(1+.06*pulse,1-.10*pulse,1+.06*pulse);
+      frills.forEach((f,i)=>{f.rotation.z=.24*Math.sin(beat+i*.7);f.rotation.x=.16*Math.cos(beat+i);});
+    };
+    inkSilhouette(model);return {group,model,legs,tail,head,kind,pose};
+  }
   if (kind === 'unicorn') {
     part(model,'fine',color,0,.99,-.24,.5,.44,.7);
     part(model,'fine',color,0,1.25,.31,.35,.52,.35,-.24);
@@ -88,6 +109,91 @@ export function creature(spec) {
       const leg = new T.Group(); leg.position.set(x,.91,z); model.add(leg); legs.push(leg);
       part(leg,'fine',color,0,-.37,0,.141,.44,.15);
       part(leg,'fine','#d8a7ab',0,-.741,.026,.15,.136,.157);
+    }
+  } else if(['silkskip','rollbud','pealfoot'].includes(kind)){
+    let pose;
+    if(kind==='silkskip'){
+      part(model,'fine',color,0,.46,0,.33,.19,.59);
+      head.position.set(0,.48,.36);
+      part(head,'fine',color,0,0,.03,.33,.18,.26);eyes(head,.16,.05,.21,.059);
+      const fins=[],ribbons=[];
+      for(const side of [-1,1]){
+        const fin=new T.Group();fin.position.set(side*.22,.47,-.04);model.add(fin);fins.push(fin);
+        part(fin,'diamond',color,side*.37,0,-.08,.61,.095,.41,0,side*.29);
+        part(fin,'diamond',accent,side*.72,.018,-.16,.30,.064,.17,0,side*.38);
+        for(let j=0;j<3;j++)part(fin,'sphere',white,side*(.24+j*.13),.074,-.04-j*.034,.044,.018,.061);
+        let parent=tail;
+        for(let j=0;j<4;j++){
+          const link=new T.Group();link.position.set(j?0:side*.12,j?0:.44,j?-.19:-.43);
+          parent.add(link);part(link,'fine',j%2?accent:color,0,0,-.10,.074-j*.011,.037,.157);
+          ribbons.push(link);parent=link;
+        }
+      }
+      pose=(t,moving)=>{
+        model.position.y=.55+.19*Math.sin(t*2.3);model.rotation.z=.12*Math.sin(t*1.7);
+        fins.forEach((f,i)=>f.rotation.z=(i?1:-1)*(.12+.41*Math.sin(t*(moving?5:3.3))));
+        ribbons.forEach((r,i)=>r.rotation.x=.26*Math.sin(t*4-i*.8));
+      };
+    }else if(kind==='rollbud'){
+      part(model,'fine',color,0,.45,-.08,.40,.38,.61);
+      head.position.set(0,.47,.44);part(head,'fine',color,0,0,.05,.28,.24,.33);
+      part(head,'fine','#f0c598',0,-.04,.29,.18,.13,.23);part(head,'sphere',ink,0,-.012,.48,.064,.043,.043);
+      eyes(head,.17,.06,.264,.054);
+      const plates=[];
+      for(let row=0;row<4;row++)for(const side of [-1,0,1]){
+        const plate=part(model,'diamond',row%2?accent:'#a5b986',side*.25,.79-Math.abs(side)*.09-row*.021,.27-row*.21,.165,.14,.25,-.34,0,side*-.35);
+        plates.push(plate);
+      }
+      tail.position.set(0,.42,-.56);
+      for(let j=0;j<4;j++)part(tail,'diamond',j%2?accent:color,0,-j*.054,-j*.16,.23-j*.045,.17-j*.03,.25-j*.02);
+      for(const x of [-.23,.23])for(const z of [-.34,.28]){
+        const leg=new T.Group();leg.position.set(x,.32,z);model.add(leg);legs.push(leg);
+        part(leg,'fine',color,0,-.11,.036,.11,.17,.14);
+        for(const dx of [-.042,.034])part(leg,'cone',white,dx,-.218,.15,.025,.092,.025,1.42);
+      }
+      pose=(t,moving)=>{plates.forEach((p,i)=>p.rotation.x=-.34+.12*Math.sin(t*(moving?7:2)-Math.floor(i/3)*.8));tail.rotation.y=.43*Math.sin(t*3.7);};
+    }else{
+      part(model,'fine',color,0,.39,-.15,.46,.32,.42);head.position.set(0,.48,.15);
+      part(head,'fine',color,0,0,.06,.41,.21,.31);
+      const throat=part(head,'fine',accent,0,-.14,.23,.24,.13,.19);
+      for(const side of [-1,1]){
+        part(head,'sphere',color,side*.25,.18,.16,.15,.15,.14);
+        part(head,'sphere',ink,side*.25,.20,.279,.081,.09,.038);
+        part(head,'sphere',white,side*.25-.022,.225,.312,.027,.029,.012);
+        part(model,'fine',color,side*.34,.24,-.27,.19,.19,.32,-.32,0,side*.26);
+        for(const z of [-.38,.23])for(const n of [-1,0,1]){
+          part(model,'fine',accent,side*(.34+n*.055),.086,z+.096,.034,.035,.15,0,n*.30);
+        }
+      }
+      pose=(t,moving)=>{const hop=Math.max(0,Math.sin(t*(moving?6:2.4)));
+        model.position.y=hop*hop*(moving?.47:.14);model.rotation.x=-hop*.18;
+        throat.scale.y=.13+.093*(1+Math.sin(t*4));throat.scale.z=.19+.061*(1+Math.sin(t*4));};
+    }
+    inkSilhouette(model);return {group,model,legs,tail,head,kind,pose};
+  } else if(kind==='snail'){
+    part(model,'fine',color,0,.24,-.03,.38,.24,.73);
+    part(model,'fine','#e3dba4',0,.14,.08,.36,.12,.64);
+    part(model,'fine',accent,0,.66,-.21,.45,.49,.49);
+    for(const side of [-1,1]){
+      // Follow the curved surface of the shell so both profiles show a continuous spiral.
+      const points=[];
+      for(let i=0;i<=28;i++){
+        const t=i/28,r=.035+t*.39,a=t*Math.PI*3.7;
+        points.push(new T.Vector3(side*(.455*Math.sqrt(1-(r/.49)**2)),.66+r*Math.sin(a),-.21+r*Math.cos(a)));
+      }
+      model.add(new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3(points),32,.027,5,false),material('#f8cca2')));
+    }
+    for(let i=0;i<5;i++){
+      const a=i*Math.PI*2/5;
+      part(model,'fine','#fff2cd',.11*Math.cos(a),1.15,-.21+.11*Math.sin(a),.10,.05,.07,0,-a);
+    }
+    part(model,'sphere','#efb649',0,1.19,-.21,.064,.043,.064);
+    head.position.set(0,.46,.46);
+    part(head,'fine',color,0,.04,0,.285,.31,.266);
+    eyes(head,.15,.064,.209,.062);
+    for(const side of [-1,1]){
+      branch(head,color,[side*.14,.20,.01],[side*.21,.48,.07],.036);
+      part(head,'fine','#f3bf95',side*.21,.48,.07,.074,.08,.072);
     }
   } else if (kind === 'hare' || kind === 'fox') {
     const fox=kind==='fox';
@@ -308,6 +414,7 @@ export function animate(model,t,moving) {
   model.wings?.forEach((wing,i)=>{wing.rotation.z=Math.sin(t*(model.kind==='bee'?24:11))*(i===0?.52:-.52);});
   if(model.tail) model.tail.rotation.y=Math.sin(t*4.5)*.22;
   model.head.rotation.z=Math.sin(t*1.65)*.042;
+  model.pose?.(t,moving);
   if(model.expression){
     const {face,open,closed}=model.expression;
     face.material=Math.abs(t%4.17-3.88)<.075?closed:open;

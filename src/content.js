@@ -4,6 +4,8 @@ import {newItems,newRecipes,newSpecies,newWildlife,newVillagers,newRegions,newRe
 import {atlas,homeland,horizonSpecies,horizonWildlife,horizonVillagers,horizonRegions,horizonRegionAt,horizonItems,horizonRecipes} from './horizons.js';
 import {defaultLook} from './wardrobe.js';
 import {farmItems,farmRecipes,newHomestead} from './homestead.js';
+import {dungeonRelics} from './dungeon-habitats.js';
+import {newDungeons} from './dungeons.js';
 
 export const SAVE_KEY = 'rainbow-roam-celshade-v1';
 export const restTimes={sunrise:6.35,sunset:18.05,night:22.15};
@@ -15,11 +17,16 @@ export const items = {
   ...horizonItems,
   ...farmItems,
   ...activityItems,
+  ...dungeonRelics,
+  nautilusLocket:['Nautilus Locket','gem'],
+  moonDial:['Moon-Tide Dial','compass'],
+  tideCompass:['Saltglass Tide Compass','compass'],
   wood: ['Wood', 'trees'], stone: ['River stone', 'mountain'], petal: ['Bloom petal', 'flower-2'],
   berry: ['Sunberry', 'cherry'], crystal: ['Starglass', 'gem'], treat: ['Meadow biscuit', 'cookie'],
   charm: ['Rainbow charm', 'sparkles'], plank: ['Timber block', 'box'], brick: ['Stone block', 'brick-wall'],
   fence: ['Garden fence', 'fence'], lantern: ['Bloom lantern', 'lamp'], planter: ['Flower box', 'sprout'],
-  roof: ['Rose roof', 'house'], stool: ['Wooden bench', 'armchair']
+  roof: ['Rose roof', 'house'], stool: ['Wooden bench', 'armchair'],
+  hpPotion:['Heartleaf potion','heart']
 };
 
 export const recipes = {
@@ -34,10 +41,14 @@ export const recipes = {
   stool: { cost: { wood: 3 }, count: 1, build: true },
   ...newRecipes,
   ...horizonRecipes,
-  ...farmRecipes
+  ...farmRecipes,
+  hpPotion:{cost:{berry:2,petal:1},count:1}
 };
 
 export const species = {
+  lanternbell:{reefIcon:'jellyfish',name:'Lanternbell',family:'Pearl jelly',kind:'belljelly',color:'#c79be6',accent:'#ffe3a4',favorite:'petal',trust:1,place:'Undertow · Pearl Nursery',lore:'Its bell lights up at the touch of a petal. Hatchlings bob together in the shelter of the wreck.'},
+  pennyglide:{reefIcon:'skate',name:'Pennyglide',family:'Copper skate',kind:'silkskip',color:'#dd9568',accent:'#a4e8d3',favorite:'berry',trust:1,place:'Undertow · Copper Gardens',lore:'This palm-sized ray sifts copper pennies out of the sand and stacks them beneath its favorite fan coral.'},
+  dewbutton:{name:'Dewbutton',family:'Blossom snail',kind:'snail',color:'#a8c781',accent:'#d98a91',favorite:'berry',trust:1,place:'Petalwick',lore:'It carries a tiny daisy garden on its spiral shell and stretches up to sniff sunberries.'},
   pearly: { name: 'Pearlyspark', family: 'Rainbow unicorn', kind: 'unicorn', color: '#fff2df', accent: '#ee83ab', favorite: 'treat', trust: 1, place: 'Petalwick', lore: 'Tiny rainbows follow it through the dew. It always circles back for friends.' },
   dawn: { name: 'Dawnwhirl', family: 'Rainbow unicorn', kind: 'unicorn', color: '#ffe1bb', accent: '#fa9a77', favorite: 'treat', trust: 2, place: 'Sunseed Fields', lore: 'It races the first rays of morning and naps wherever it loses.' },
   nebula: { name: 'Nebulamane', family: 'Rare rainbow unicorn', kind: 'unicorn', color: '#e5d5ff', accent: '#ae8af8', favorite: 'charm', trust: 2, place: 'Starglass Ridge', lore: 'The prismatic glow in its mane is brightest when it hums.' },
@@ -57,6 +68,7 @@ export const wildlife = [
   ['moss', -42, -25, 3], ['ripple', 14, -12, 1], ['dew', 32, 4, 2],
   ['dawn', -22, 37, 3], ['ember', 17, 42, 3], ['thimble', 27, -46, 3], ['nebula', 43, -54, 2],
   ...newWildlife,
+  ['dewbutton', -2.8, 4.65, .46],
   ...horizonWildlife
 ];
 
@@ -111,6 +123,7 @@ export function newGame() {
     version:1, realm:homeland, transit:null, stamp:{}, care:{}, magic:{house:null,known:[],mastered:{}}, look:{...defaultLook}, player:{...START}, inventory:{ treat:1, wood:4, berry:2 }, bonds:{},
     companions:[], active:null, quests:{poppy:'active'}, crafted:{}, placed:{}, blocks:[],
     wallet:{coins:30,badges:0},homestead:newHomestead(),loot:[],townLife:newTownLife(),bounties:{target:null,captured:{},abducted:null,raidClock:0},
+    spirehaven:{dials:{},aligned:false},roomActivities:{},trails:{},dungeons:newDungeons(),health:5,
     discoveries:['village'], harvested:{}, selected:'plank', trackingItem:null, trackingQuest:null, sound:true, time:8
   };
 }

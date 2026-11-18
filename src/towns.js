@@ -1,6 +1,8 @@
 import * as T from 'three';
 import {part,branch} from './models.js';
-import {townsByPlace,townProfiles,townWater,townPavement} from './town-data.js';
+import {townsByPlace,townProfiles,townWater,townPavement,regionalRoomById} from './town-data.js';
+import {regionalDesigns} from './regional-designs.js';
+import {regionalFacade,regionalPlaza,regionalRoof} from './regional-architecture.js';
 
 const timber='#806353';
 const cream='#eee1bb';
@@ -20,7 +22,8 @@ function floorAt(height,parent,x,z,w,d,palette,pattern){
 }
 
 function pavedTown(parent,town,height){
-  const palette=town.layout==='harbor'?['#c6ac95','#b19a82','#d3bc9f','#d6c4a9']:town.layout==='courtyard'?pathColors:dryStone;
+  const palette=town.design?[pathColors[0],dryStone[1],town.palette[1],new T.Color(town.palette[0]).lerp(new T.Color('#f2e5d1'),.52).getStyle()]:
+    town.layout==='harbor'?['#c6ac95','#b19a82','#d3bc9f','#d6c4a9']:town.layout==='courtyard'?pathColors:dryStone;
   const runs=townPavement(town);
   runs.forEach(([x,z,w,d],i)=>floorAt(height,parent,x,z,w,d,palette,i));
   return runs;
@@ -57,7 +60,7 @@ function featureAtDoor(g,kind,edge,accent){
   }
 }
 
-function building(group,home,arch,palette,nightGlass,height,blockers){
+function building(group,home,arch,palette,nightGlass,height,blockers,design){
   const {kind,index,x,z,yaw,width:w,depth:d}=home;
   const [wall,light,roof,accent]=palette;
   const base=new T.Group();
@@ -74,9 +77,10 @@ function building(group,home,arch,palette,nightGlass,height,blockers){
   }));
   const wide=kind==='garden'||kind==='market';
   const gate=wide?door+.7:door;
+  const room=regionalRoomById(home.stop?.id);
   const wallH=top+.22;
   box(base,'#ad947d',0,-skirt/2,0,w+.22,skirt+.03,d+.19);
-  box(base,kind==='garden'?'#c6bc94':'#d9b58f',0,.03,0,w-.22,.082,d-.19);
+  if(!room) box(base,kind==='garden'?'#c6bc94':'#d9b58f',0,.03,0,w-.22,.082,d-.19);
   box(base,color,0,top/2,-front,w,wallH,.25);
   for(const side of [-1,1]){
     box(base,color,side*half,top/2,0,.22,wallH,d-.17);
@@ -97,7 +101,10 @@ function building(group,home,arch,palette,nightGlass,height,blockers){
   box(base,color,0,(top+2.38)*.5,front,gate,top-2.33,.245);
   box(base,timber,0,2.35,front+.10,gate+.46,.182,.26);
 
-  if(arch==='adobe'||kind==='garden'){
+  if(design&&kind!=='garden'){
+    regionalRoof(base,design,w,d,top,kind);
+    regionalFacade(base,design,w,d,top,gate,kind);
+  }else if(arch==='adobe'||kind==='garden'){
     box(base,arch==='adobe'?light:'#99b4ad',0,top+.12,0,w+.23,.31,d+.29);
     for(const side of [-1,1]){
       const fr=front+.12;
@@ -133,7 +140,7 @@ function building(group,home,arch,palette,nightGlass,height,blockers){
       box(base,light,w*.28,top+1.39,-d*.21,.75,.17,.64);
     }
   }
-  const silhouette=kind==='hall'?5.7:kind==='lookout'?5.35:0;
+  const silhouette=design?0:kind==='hall'?5.7:kind==='lookout'?5.35:0;
   if(silhouette){
     part(base,'cyl',light,0,silhouette-.53,-front*.74,.61,1.21,.61);
     part(base,'cone',roof,0,silhouette+.37,-front*.74,.92,1.5,.92);
@@ -145,9 +152,11 @@ function building(group,home,arch,palette,nightGlass,height,blockers){
   if(kind==='market'){
     for(const sign of [-1,1]){
       branch(base,timber,[sign*(half-.3),0,front+1.23],[sign*(half-.3),2.57,front+1.23],.079);
-      const start=sign*(gate*.6+.28);
-      box(base,'#b4876c',start,.67,front-.61,.75,1.22,1.22);
-      for(let i=0;i<3;i++)part(base,'fine',i%2?'#ddae88':'#e5cba2',start,.335+(i===1?.72:.44),front-1.04+i*.34,.22,.13,.22);
+      if(!room){
+        const start=sign*(gate*.6+.28);
+        box(base,'#b4876c',start,.67,front-.61,.75,1.22,1.22);
+        for(let i=0;i<3;i++)part(base,'fine',i%2?'#ddae88':'#e5cba2',start,.335+(i===1?.72:.44),front-1.04+i*.34,.22,.13,.22);
+      }
     }
     for(let i=0;i<10;i++)
       box(base,i%2?a:cream,(i-4.5)*(w-.40)/10,2.62,front+.66,(w-.33)/10,.06,1.63,.12);
@@ -160,7 +169,7 @@ function building(group,home,arch,palette,nightGlass,height,blockers){
         if(i%2)part(base,'fine','#e8b0b2',sign*(half-.55),.925,pz,.12,.088,.084);
       }
     }
-  }else{
+  }else if(!room){
     const wx=half-.67;
     if(kind!=='home') box(base,'#a07864',wx,.82,-.75,1.0,.18,1.95);
     for(let i=0;i<3;i++)box(base,kind==='post'?'#dbbf96':a,wx,.965,-1.25+i*.45,.37,.13,.29);
@@ -185,7 +194,11 @@ function plaza(parent,town,height,blockers){
   const colors=town.palette;
   const cx=x+(town.layout==='courtyard'?-3.6:3.4),cz=z+4.2;
   const y=height(cx,cz);
-  if(town.layout==='harbor'){
+  const design=regionalDesigns[town.realm];
+  if(design){
+    regionalPlaza(parent,cx,y,cz,design);
+    if(['pools','prisms','pots','orchard'].includes(design.plaza)) blockers.push([cx,cz,1.27,1.07]);
+  }else if(town.layout==='harbor'){
     for(let i=0;i<5;i++){
       const xx=cx+(i-2)*.74;
       part(parent,'cyl','#947c69',xx,y+.43,cz,.16,.88,.16);
@@ -248,9 +261,16 @@ export function populateTown(parent,place,height,paletteOverride){
   const palette=paletteOverride??town.palette??['#ddbd9e','#e5ccac','#a68a9d','#a6be99'];
   const glass=new T.MeshBasicMaterial({color:'#d6c2a7'});
   const paved=pavedTown(root,town,height);
-  town.buildings.forEach(spec=>building(root,spec,town.architecture,
-    [palette[1],new T.Color(palette[1]).lerp(new T.Color('#fff0d0'),.36).getStyle(),palette[2],palette[3]],
-    glass,height,blockers));
+  const design=regionalDesigns[town.realm];
+  town.buildings.forEach(spec=>{
+    const tint=t=>new T.Color(palette[1]).lerp(new T.Color(t),.48).getStyle();
+    const home=town.design&&spec.kind!=='hall';
+    const wall=home?tint(palette[(spec.index+town.design.length)%4]):palette[1];
+    const arch=home&&spec.index%4===1?town.layout==='courtyard'?'row':'gabled':town.architecture;
+    const roof=home&&spec.index%3===0?new T.Color(palette[2]).lerp(new T.Color(palette[3]),.54).getStyle():palette[2];
+    building(root,spec,arch,[wall,new T.Color(wall).lerp(new T.Color('#fff0d0'),.46).getStyle(),roof,palette[3]],
+      glass,height,blockers,design);
+  });
   plaza(root,town.palette?town:{...town,palette},height,blockers);
   const blocks=(x,z)=>blockers.some(([px,pz,rx,rz])=>Math.abs(x-px)<rx&&Math.abs(z-pz)<rz);
   return {root,blocks,isPaved:(x,z)=>paved.some(([px,pz,w,d])=>Math.abs(x-px)<w/2&&Math.abs(z-pz)<d/2),

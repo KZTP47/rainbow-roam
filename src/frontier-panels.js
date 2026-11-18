@@ -1,7 +1,7 @@
 import {icon} from './icons.js';
 import {items,recipes,species} from './content.js';
 import {atlas} from './horizons.js';
-import {home,nearHomestead,roomReady,crops,cropFood,furnishings,currencies,sellPrice} from './homestead.js';
+import {home,nearHomestead,roomReady,crops,cropFood,furnishings,currencies,sellPrice,extensions} from './homestead.js';
 import {marketAt} from './market.js';
 import {BANDITS} from './combat.js';
 import {propertyMap} from './property-map.js';
@@ -21,7 +21,7 @@ const tabRow=(group,choices,active)=>`<div class="tab-row">${choices.map(([id,la
 export function frontierPanels(state,{action,itemBadge,wantedBadge,propertyPreview,trackItem}){
   const selected={bag:'all',item:null,market:'buy',home:'garden',homeMode:'choose',bounty:'open',filedIn:'all',posting:null};
   let farmSignature='',lastMarket=null,marketPlace=null;
-  const propertySelection={house:0,garden:0,sunroom:0,workshop:0,loft:0};
+  const propertySelection={house:0,garden:0,...Object.fromEntries(Object.keys(extensions).map(id=>[id,0]))};
   const purse=()=>`<div class="purse" aria-label="Wallet">${Object.entries(currencies).map(([id,currency])=>
     `<span class="purse-${id}">${icon(currency.icon,16)} <strong>${state.wallet[id]}</strong> ${currency.name}</span>`).join('')}</div>`;
 

@@ -11,6 +11,8 @@ import {populateTown,populateTownLandscape} from './towns.js';
 import {eveningLights} from './daylight.js';
 import {frontierPlaces} from './frontier.js';
 import {skyIslands,skyItemIslands,skyRim,skyWalkRadius} from './sky-islands.js';
+import {wards,wardRoads} from './city-wards.js';
+import {populateWard} from './spirehaven-art.js';
 import {buildSkyLandmark} from './sky-landmarks.js';
 import {groundGrain,plantHabitats,terrainRelief} from './habitat.js';
 import {arcanum,inRiver,overBridge,riverCenter,riverLevel,riverWidth,silverrunRoadDistance,silverrunWalls} from './silverrun.js';
@@ -18,6 +20,12 @@ import {populateSilverrun} from './silverrun-art.js';
 import {coastBridge,coastRiverX,coastRiverY,coastRoadDistance,inCoastRiver,pierAt,piers,seaHeight,shoreZ} from './silvercoast.js';
 import {populateSilvercoast} from './silvercoast-art.js';
 import {onShip,shipHeight} from './marigold.js';
+import {newRegions,pathDistance,regionalPath} from './new-regions.js';
+import {buildNewRegion} from './new-regions-art.js';
+import {regionalRoomsFor} from './town-data.js';
+import {populateWalkInRooms} from './spirehaven-room-art.js';
+import {regionalGate} from './regional-architecture.js';
+import {regionalDesigns} from './regional-designs.js';
 
 const TAU=Math.PI*2;
 const rock='#858499', sandstone='#cc9578', timber='#84665f', gold='#e8b977';
@@ -122,6 +130,10 @@ export function horizonTerrain(realm){
       const cut=(1-T.MathUtils.smoothstep(radius,.78,1.18))*2.48*(1-bridge);
       return trimHeight(realm,x,z,data.height+(noise+terrainRelief(realm,x,z))*buildings-cut);
     }
+    if(wards[realm]){
+      const heights=realm==='starward'?2.2*T.MathUtils.smoothstep(-z,4,31):realm==='cooperward'?.8*T.MathUtils.smoothstep(z,14,34):0;
+      return trimHeight(realm,x,z,data.height+heights+noise*.17);
+    }
     let y=data.height+noise+Math.sin(x*.182+z*.124)*Math.cos(z*.17-x*.1)*.51+terrainRelief(realm,x,z);
     const place=nearestIsland(places,x,z);
     const index=places.indexOf(place);
@@ -180,6 +192,7 @@ function coloredGround(scene,realm,land,places){
   const color=new T.Color(),ground=[];
   const pavers=new T.Color('#d5c1ad'), riverbank=new T.Color('#bcb99d');
   const localColor=new Map(land.places.map(p=>[p,new T.Color(p.color)]));
+  const ownPath=newRegions[realm]?regionalPath(newRegions[realm]):null;
   for(const place of realm==='sky'?places:[null]){
     const geo=place?null:new T.PlaneGeometry(118,118,130,130);
     if(place) {
@@ -216,6 +229,10 @@ function coloredGround(scene,realm,land,places){
         color.lerp(light,(1-T.MathUtils.smoothstep(road,.9,2.6))*.38);
         if(district===1||district===3) color.lerp(accent,n*.12);
       }
+      if(wards[realm]){
+        const road=Math.min(...wardRoads.map(path=>pathDistance(path,x,z)));
+        color.lerp(pavers,(1-T.MathUtils.smoothstep(road,1.9,3.5))*.94);
+      }
       if(realm==='silverrun'){
         const road=silverrunRoadDistance(x,z);
         const square=Math.max(Math.abs(x-13)-11,Math.abs(z-14)-7.4);
@@ -227,6 +244,10 @@ function coloredGround(scene,realm,land,places){
         const road=coastRoadDistance(x,z);
         const beach=1-T.MathUtils.smoothstep(shoreZ(x)-z,4,16);
         color.lerp(pavers,Math.max(beach,1-T.MathUtils.smoothstep(road,.95,2.45))*.93);
+      }
+      if(ownPath){
+        const dist=pathDistance(ownPath,x,z);
+        color.lerp(pavers,(1-T.MathUtils.smoothstep(dist,.85,1.8))*.58);
       }
       const speck=(Math.sin(x*1.11-z*.78)*Math.sin(z*.94+x*.68))*.5+.5;
       color.lerp(shade,Math.max(0,.087*(speck-.30)));
@@ -831,7 +852,11 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
   const waterfalls=[],sails=[],flocks=[];
   let updateSchool,updateCampus;
   const town=campus||floating?null:populateTown(group,atlas[realm].entry,land.height,atlas[realm].colors);
+  const townRooms=(newRegions[realm]||wards[realm])&&!preview
+    ?populateWalkInRooms(group,scene,land.height,blockers,regionalRoomsFor(realm)):null;
   const animateFrontier=populateTownLandscape(group,scene,realm,land.height,rand,blockers,waterMaterial);
+  const updateNewRegion=newRegions[realm]?buildNewRegion(group,scene,realm,land,rand,blockers,preview):null;
+  const wardUpdate=wards[realm]?populateWard(group,scene,realm,blockers,land.height):null;
   const animateSilverrun=silverrun?populateSilverrun(group,scene,land.height,blockers,waterMaterial):null;
   if(silvercoast) populateSilvercoast(group,scene,land.height,blockers,waterMaterial);
   if(campus) {
@@ -842,7 +867,7 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
   for(const place of visiblePlaces){
     const index=land.places.indexOf(place),id=regionIds[index],island=skyIslands[id];
     if(!campus){
-      if(!silverrun&&!silvercoast) buildBiome(group,place,realm,land,rand,blockers);
+      if(!wards[realm]&&!silverrun&&!silvercoast&&!newRegions[realm]) buildBiome(group,place,realm,land,rand,blockers);
       if(island) buildSkyLandmark(group,place,island,land.height,blockers);
       const [sx,sz]=place.marker;
       const y=land.height(sx,sz);
@@ -850,7 +875,9 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
       part(group,'diamond',lantern,sx,y+1.47,sz,.18,.25,.17);
     }
     const [x,z]=voyageGate(realm,id);
-    travelArch(group,land.height,x,z,floating);
+    const design=regionalDesigns[realm];
+    if(design) regionalGate(group,x,land.height(x,z),z,design);
+    else travelArch(group,land.height,x,z,floating);
     if(floating){
       cliff(scene,place,land,index);
       if(index===0) for(let i=0;i<6;i++){
@@ -881,7 +908,7 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
       }
     }
   }
-  if(!floating) {
+  if(!floating&&!wards[realm]) {
     const [,,rim]=atlas[realm].colors;
     const ridges=new T.BufferGeometry(),points=[],indices=[];
     const segs=200,rings=7;
@@ -909,7 +936,7 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
       const ocean=new T.Mesh(new T.PlaneGeometry(150,260,1,1),waterMaterial);
       ocean.position.set(-118,.48,0);ocean.rotation.x=-Math.PI/2;scene.add(ocean);
     }
-  }else{
+  }else if(floating){
     const cloudMat=celMaterial('#f0edfa',{emissive:'#beb7d5',emissiveIntensity:.28});
     for(let i=0;i<23;i++){
       const a=i*2.39996,r=35+rand()*78;
@@ -932,8 +959,10 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
   const isClear=(x,z)=>!town?.blocks(x,z)&&blockers.every(([px,pz,r,depth])=>
     depth?Math.abs(x-px)>r||Math.abs(z-pz)>depth:Math.hypot(x-px,z-pz)>r);
   const reserved=realmRegions(realm).flatMap(([id,place])=>[place.travel,voyageGate(realm,id),...(place.marker?[place.marker]:[])]);
-  const habitat=silverrun?'woods':silvercoast?'coast':frontierHabitat[realm]??(profile&&(['heath','meadow','orchards'].includes(profile.biome)?'woods':profile.biome))??realm;
-  const animateGrass=preview?null:plantHabitats(scene,group,habitat,land,(x,z)=>isClear(x,z)&&!town?.isPaved(x,z)&&
+  const habitat=silverrun||wards[realm]?'woods':silvercoast?'coast':frontierHabitat[realm]??(profile&&(['heath','meadow','orchards'].includes(profile.biome)?'woods':profile.biome))??realm;
+  const ownPath=newRegions[realm]?regionalPath(newRegions[realm]):null;
+  const animateGrass=preview?null:plantHabitats(scene,group,habitat,land,(x,z)=>isClear(x,z)&&!town?.isPaved(x,z)&&(!wards[realm]||wardRoads.every(path=>pathDistance(path,x,z)>2.6))&&
+    (!ownPath||pathDistance(ownPath,x,z)>1.22)&&
     (!silvercoast||(land.walkable(x,z)&&!pierAt(x,z)&&!onShip(x,z)&&coastRoadDistance(x,z)>2.5))&&(!silverrun||
     (land.walkable(x,z)&&silverrunRoadDistance(x,z)>2.6&&
       !(x>silverrunWalls.west&&x<silverrunWalls.east&&z>silverrunWalls.north&&z<silverrunWalls.south)&&
@@ -942,6 +971,7 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
 
 
   if(preview) return { update(t){
+    updateNewRegion?.(t);
     for(const [i,water] of waterfalls.entries()) water.scale.x=1+Math.sin(t*2.15+i)*.13;
   }};
   const trailLights=land.places.flatMap(place=>{
@@ -970,7 +1000,10 @@ export function populateHorizon(scene,realm,land,state,preview=false,visiblePlac
       updateSchool?.(t,state);
       updateCampus?.(t);
       town?.update(state.time);animateFrontier(t);
-      animateSilverrun?.(t);
+      townRooms?.update(t,player,null,state.roomActivities);
+      updateNewRegion?.(t);
+      wardUpdate?.(t,state.time);
+      animateSilverrun?.(t,player,state.spirehaven);
       lightTrails(state.time,player);
       waterClock.value=t;
       animateGrass(t);

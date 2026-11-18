@@ -1,7 +1,7 @@
 import * as T from 'three';
 
 const bands = new T.DataTexture(
-  new Uint8Array([24,24,24,24,24,53,53,53,134,134,134,134,217,217,255,255]),
+  new Uint8Array([33,33,33,55,55,82,82,126,126,158,158,197,197,226,250,250]),
   16,1,T.RedFormat
 );
 bands.minFilter=bands.magFilter=T.NearestFilter;

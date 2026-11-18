@@ -6,8 +6,13 @@ import {normalizeBounties} from './combat.js';
 import {normalizeLoot} from './loot.js';
 import {normalizeTownLife} from './town-life.js';
 import {inHold} from './marigold.js';
+import {dialFaces,starDials} from './spirehaven-rooms.js';
+import {trails} from './town-trails.js';
+import {normalizeRoomActivities} from './regional-interiors.js';
+import {normalizeDungeons} from './dungeons.js';
 
 const format='rainbow-roam-save';
+const checkpointKey='rainbowRoamCheckpoint';
 const maxFileSize=2_000_000;
 const isRecord=value=>value!==null&&typeof value==='object'&&!Array.isArray(value);
 const known=(record,id)=>typeof id==='string'&&Object.hasOwn(record,id);
@@ -82,7 +87,12 @@ export function normalizeSave(saved){
     selected:known(recipes,saved.selected)&&recipes[saved.selected].build?saved.selected:fresh.selected,
     trackingItem:known(items,saved.trackingItem)?saved.trackingItem:null,
     trackingQuest:!known(items,saved.trackingItem)&&questIds.includes(saved.trackingQuest)&&saved.quests?.[saved.trackingQuest]!=='done'?saved.trackingQuest:null,
-    homestead:normalizeHomestead(saved.homestead)
+    homestead:normalizeHomestead(saved.homestead),
+    dungeons:normalizeDungeons(saved.dungeons),health:number(saved.health,5,.1,5),
+    trails:filtered(saved.trails,Object.keys(trails),v=>Number.isInteger(v)&&v>0&&v<=5?v:undefined),
+    roomActivities:normalizeRoomActivities(saved.roomActivities),
+    spirehaven:{aligned:saved.spirehaven?.aligned===true,dials:filtered(saved.spirehaven?.dials,starDials,value=>
+      Number.isInteger(value)&&value>=0&&value<dialFaces.length?value:undefined)}
   };
 }
 
@@ -100,10 +110,46 @@ function filteredHarvests(raw){
   ).slice(0,3500).map(([id,value])=>[id,Math.min(value,latest)]));
 }
 
-export function loadGame(){
+function decodeCheckpoint(raw){
   try {
-    const raw=localStorage.getItem(SAVE_KEY);
-    return raw?normalizeSave(JSON.parse(raw)):null;
+    if(!raw) return null;
+    const saved=JSON.parse(raw);
+    return {progress:normalizeSave(saved),savedAt:Number.isFinite(saved.savedAt)?saved.savedAt:0};
+  } catch {return null;}
+}
+
+let lastSavedAt=0;
+
+export function loadGame(){
+  let shared,tab;
+  try {shared=decodeCheckpoint(localStorage.getItem(SAVE_KEY));} catch {}
+  try {tab=decodeCheckpoint(sessionStorage.getItem(SAVE_KEY));} catch {}
+  let latest=shared;
+  for(const checkpoint of [tab,decodeCheckpoint(history.state?.[checkpointKey])]){
+    if(checkpoint&&(!latest||checkpoint.savedAt>latest.savedAt)) latest=checkpoint;
+  }
+  lastSavedAt=latest?.savedAt??0;
+  return latest?.progress??null;
+}
+
+export function saveGame(progress){
+  const savedAt=Math.max(Date.now(),lastSavedAt+1);
+  const raw=JSON.stringify({...progress,savedAt});
+  try {
+    localStorage.setItem(SAVE_KEY,raw);
+    lastSavedAt=savedAt;
+    return 'browser';
+  } catch {}
+  try {
+    sessionStorage.setItem(SAVE_KEY,raw);
+    lastSavedAt=savedAt;
+    return 'tab';
+  } catch {}
+  try {
+    // A history entry keeps its state across reloads even when site storage is blocked.
+    history.replaceState({...history.state,[checkpointKey]:raw},'');
+    lastSavedAt=savedAt;
+    return 'tab';
   } catch {return null;}
 }
 

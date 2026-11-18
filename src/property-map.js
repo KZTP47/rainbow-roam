@@ -11,7 +11,10 @@ const mapConfig={
   garden:{origin:[398,125],spots:gardenSpots,title:'Garden',hint:'Choose a bed to plant, water, or harvest.'},
   sunroom:{origin:[397,142],spots:[[1.04,3.45],[4.65,1.03]],title:extensions.sunroom.name,hint:'Propagate clover at the potting bench.'},
   workshop:{origin:[397,142],spots:[[2.08,1.18],[4.74,3.77]],title:extensions.workshop.name,hint:'Use the workbench to sew a rug.'},
-  loft:{origin:[397,142],spots:[[4.71,1.15],[.89,3.89]],title:extensions.loft.name,hint:'Rest upstairs to give crops time to grow.'}
+  loft:{origin:[397,142],spots:[[4.71,1.15],[.89,3.89]],title:extensions.loft.name,hint:'Rest in the loft to give crops time to grow.'},
+  kitchen:{origin:[397,142],spots:[[4.36,1.53],[1.05,3.75]],title:extensions.kitchen.name,hint:'Cook honey carrot stew in the kitchen.'},
+  companionNook:{origin:[397,142],spots:[[1.17,3.54],[4.34,3.10]],title:extensions.companionNook.name,hint:'Spend a little time with your companion.'},
+  wizardTower:{origin:[397,142],spots:[[.87,1.10],[4.68,2.95]],title:extensions.wizardTower.name,hint:'Travel between your homestead and built dungeon towers.'}
 };
 
 export const propertySpots=view=>mapConfig[view].spots;
@@ -183,7 +186,13 @@ const annexFixtures={
   workshop:{walls:['#e9c5a7','#c7987b','#ad7e6f'],floor:['#e7c0a0','#bf9177','#94705e'],
     tiles:['#ecd0a7','#ddb88e','#e2bf97','#edc8a5']},
   loft:{walls:['#e5d2e3','#b5a4bb','#9a8ba1'],floor:['#e1ccda','#b29ca7','#907a88'],
-    tiles:['#e4d2d9','#e5cfc7','#d7c0c6','#eddeca']}
+    tiles:['#e4d2d9','#e5cfc7','#d7c0c6','#eddeca']},
+  kitchen:{walls:['#efd1b0','#c89179','#ab7769'],floor:['#edc7a7','#bf8f78','#9b7267'],
+    tiles:['#eecaa7','#ddb38c','#e7b69c','#efdbc3']},
+  companionNook:{walls:['#e4e8c9','#b5c7a7','#82a08f'],floor:['#ded0a8','#b2aa84','#9d906b'],
+    tiles:['#eddbab','#ddd0a6','#d6cbab','#ece2c4']},
+  wizardTower:{walls:['#dbcbe7','#af9cc0','#9182b0'],floor:['#d5c6da','#a092b6','#82769c'],
+    tiles:['#dbcfe0','#d0c5d9','#c5b9d7','#e1d9e9']}
 };
 
 function drawAnnex(p,view,decor,selected){
@@ -228,7 +237,7 @@ function drawAnnex(p,view,decor,selected){
       p.box(.52,y,.07,.12,26,20,['#ad9baa','#866f71','#7b6068']);
       p.box(.54,y-.07,.07,.26,43,7,['#dfc9a9','#aa8b74','#9c816d']);
     }
-  }else {
+  }else if(view==='loft'){
     p.box(1.92,.28,1.74,.61,3,58,['#e8c4b4','#ac8c83','#947679']);
     for(const z of [4,25,46]){
       p.box(1.92,.27,1.75,.64,z,4,['#f0ceb8','#b89384','#8c706d']);
@@ -238,6 +247,31 @@ function drawAnnex(p,view,decor,selected){
     p.oval(5.56,4.82,1,37,19,'#c9b4d3');
     p.oval(5.56,4.82,2,30,15,'#d8c6e3');
     p.oval(5.56,4.82,3,19,9,'#e3d2e9');
+  }else if(view==='kitchen'){
+    p.box(.31,.56,2.28,.77,0,37,['#dbb698','#9e7263','#875c58']);
+    p.box(.23,.48,2.47,.91,36,6,['#efcc9e','#a87361','#935e59']);
+    p.box(.51,.76,.71,.46,42,17,['#bc927e','#8d706d','#78585c']);
+    p.box(.64,1.23,.45,.026,45,8,['#543f48','#543f48','#543f48']);
+    for(let i=0;i<4;i++) p.oval(1.53+i*.22,.87,44,6,4,['#e6a974','#c77d5e'][i%2]);
+  }else if(view==='companionNook'){
+    for(const [i,x] of [.34,4.94].entries()){
+      p.box(x,.70,1.15,.93,0,13,['#e2c299','#b19b7b','#98876c']);
+      p.oval(x+.57,1.11,14,33,16,i?'#a9c7b6':'#d7b0be');
+      p.oval(x+.57,1.11,16,27,11,i?'#c0d5c5':'#ecc9cf');
+    }
+    p.oval(3.1,1.52,1,17,9,'#966d66');
+    p.oval(3.1,1.52,5,14,7,'#8fb7c3');
+  }else{
+    p.box(2.66,.60,1.21,.57,0,30,['#c7a8ce','#9a7ea8','#80658f']);
+    p.box(2.61,.55,1.31,.69,30,7,['#dbbdde','#9877a5','#826694']);
+    p.polygon([[3.24,.88,69],[3.65,.88,50],[3.24,.88,36],[2.92,.88,50]],'#b493de','#eed1f6',1.5);
+    p.oval(3.37,2.88,2,66,36,'#a69bbd');
+    p.oval(3.37,2.88,4,57,31,'#e4c9f2');
+    p.oval(3.37,2.88,6,52,27,'#8c7ca9');
+    for(let i=0;i<12;i++){
+      const a=i*Math.PI/6;
+      p.oval(3.37+Math.sin(a)*.77,2.88+Math.cos(a)*.77,7,2.8,2.1,'#ecd6fb');
+    }
   }
   drawFurnishingSpots(p,mapConfig[view].spots,decor,selected);
 }
@@ -435,7 +469,7 @@ export function propertyMap(state,helpers,view='garden',selected=0){
         ${garden?gardenInspector(state,helpers,selected,records[selected]):houseInspector(state,helpers,selected,view)}
         ${room?`<div class="property-room-service"><h4>${room.name} service</h4>
           ${helpers.action(room.service,'homestead-service:'+view,room.icon,roomReady(state,view)?'':'disabled','small-action')}
-          <p class="property-help">${view==='workshop'?'Uses 1 wood and 1 bloom petal.':roomReady(state,view)?room.summary:'Available again shortly.'}</p>
+          <p class="property-help">${view==='workshop'?'Uses 1 wood and 1 bloom petal.':room.summary}</p>
           ${view==='workshop'?(helpers.trackItem?.('wood')??'')+(helpers.trackItem?.('petal')??''):view==='sunroom'?helpers.trackItem?.('cloverSeed')??'':''}</div>`:''}
       </aside>
     </div>
