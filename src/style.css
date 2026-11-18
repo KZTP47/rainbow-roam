@@ -363,6 +363,8 @@ kbd {display:inline-flex;justify-content:center;align-items:center;font:800 10px
 #flight-button {position:absolute;right:var(--edge);bottom:calc(163px + env(safe-area-inset-bottom));box-shadow:0 3px 12px #4b3e5438}
 #room-camera {position:absolute;right:var(--edge);bottom:calc(163px + env(safe-area-inset-bottom));display:grid;gap:6px}
 #room-camera .round {width:36px;height:36px;font-size:1.25rem}
+#room-camera {justify-items:end}
+#leave-tower {display:flex;align-items:center;gap:.4em;padding:8px 12px;border-radius:16px;background:var(--cream,#fff3df);color:#424a39;font-weight:800}
 .menu-open #room-camera {visibility:hidden}
 #flight-status {position:absolute;left:50%;transform:translateX(-50%);bottom:calc(93px + env(safe-area-inset-bottom));display:grid;text-align:center;gap:2px;padding:8px 13px;border-radius:12px;background:#fff7e8e8;color:#574661;pointer-events:none}
 #flight-status small,#flight-status em {font-size:11px;font-style:normal}

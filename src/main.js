@@ -339,6 +339,7 @@ function interact() {
   if(target.kind==='npc') talk(target.id);
   else if(target.kind==='trail-landmark') trailGames.visit('landmark');
   else if(target.kind==='dungeon') openDungeon(target.id);
+  else if(target.kind==='tower-exit') action('leave-tower');
   else if(target.kind==='homestead-room') action('homestead-service',target.id);
   else if(target.kind==='walk-in-room') useRoomStation(target.room,target.station);
   else if(target.kind==='ward-relay'){world.lightLantern();audio.play('gather');}
@@ -609,6 +610,12 @@ function action(type,id) {
     case 'town-trail':trailGames.act(id);return;
     case 'room-choice':answerRegionalActivity(id);return;
     case 'room-zoom':world?.zoomRoom(id==='in'?-.16:.16);return;
+    case 'leave-tower':
+      if(!active||ui.opened||dungeonCleanup)return;
+      if(world?.leaveWizardTower()){
+        physicalHome=true;propertyEntry=null;persist();
+      }else ui.toast('The yard is blocked','Clear some ground outside the tower.','house');
+      return;
     case 'sound':
       state.sound=!state.sound;audio.unlock();audio.sync();ui.refresh();
       if(active||loaded) persist();

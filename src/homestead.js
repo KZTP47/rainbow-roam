@@ -43,6 +43,7 @@ export function homesteadServicePoint(id){
   return room?[home.x+room.x,home.z+room.z]:undefined;
 }
 export const wizardTowerPoint=homesteadServicePoint('wizardTower');
+export const towerDoorZ=wizardTowerPoint[1]+homesteadLayout.wizardTower.halfDepth;
 
 export function propertyDoors(homestead){
   if(!homestead?.owned) return [];

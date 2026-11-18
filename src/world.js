@@ -13,7 +13,7 @@ import {canFly,geography,worldPoint,regionPoint,groundRealmAt,nearestGround,worl
 import {traveler} from './traveler.js';
 import {marketStalls} from './market.js';
 
-import {home as cloverCottage,extensions,homesteadLayout,homesteadServicePoint,propertyArea,propertyDoors} from './homestead.js';
+import {home as cloverCottage,extensions,homesteadDoorHalfWidth,homesteadLayout,homesteadServicePoint,propertyArea,propertyDoors,towerDoorZ,wizardTowerPoint} from './homestead.js';
 import {createCombat} from './combat.js';
 import {nearbyLoot,pickUpLoot} from './loot.js';
 import {landmarkPoint,newRegions} from './new-regions.js';
@@ -642,6 +642,28 @@ export function createWorld(container,state,callback) {
     return clearPath(x,z);
   }
 
+  function atTowerDoor(){
+    const {x,z}=state.player;
+    return valley&&!state.transit&&state.homestead.owned&&state.homestead.extensions.wizardTower&&
+      Math.abs(x-wizardTowerPoint[0])<1.06&&z>=towerDoorZ-.84&&z<=towerDoorZ+.19;
+  }
+
+  function leaveWizardTower(){
+    if(!active||paused||building||state.transit||!valley||
+      (propertyArea(state.player,realm,state.homestead)!=='wizardTower'&&!atTowerDoor()))return false;
+    // A returning player's construction can occupy the porch. Find clear ground on the yard side.
+    for(let depth=1.8;depth<=10;depth+=.6){
+      for(const side of [0,-.7,.7,-1.4,1.4,-2.1,2.1]){
+        const x=wizardTowerPoint[0]+side,z=towerDoorZ+depth;
+        if(!clearPath(x,z,playerFloor(x,z))||waterSurface(x,z)!==null||propertyArea({x,z},realm,state.homestead))continue;
+        // Frame the doorway from the yard so the tower wall cannot hide the player.
+        Object.assign(state.player,{x,z,yaw:0});keys.clear();resetCamera();
+        return true;
+      }
+    }
+    return false;
+  }
+
   function toggleFlight(){
     if(!active||paused||building||insideRoom()||homestead?.inside?.(state.player.x,state.player.z)) return;
     if(coastal&&state.player.belowDeck&&!state.transit) return;
@@ -670,6 +692,14 @@ export function createWorld(container,state,callback) {
       const dx=x*cx+z*sx,dz=-x*sx+z*cx;
       if(tryDirection(p.x+dx,p.z,flight)) p.x+=dx;
       if(tryDirection(p.x,p.z+dz,flight)) p.z+=dz;
+      else if(dz>0&&atTowerDoor()&&Math.abs(dx)<dz*.65){
+        // Slide past the jamb when approaching the opening slightly off-centre.
+        const offset=wizardTowerPoint[0]-p.x;
+        if(Math.abs(offset)>=homesteadDoorHalfWidth){
+          const toward=p.x+Math.sign(offset)*Math.min(Math.abs(offset),dz);
+          if(tryDirection(toward,p.z,false))p.x=toward;
+        }
+      }
       if(!combat.target){
         const aim=Math.atan2(dx,dz);
         player.group.rotation.y+=deltaAngle(player.group.rotation.y,aim)*Math.min(dt*12,1);
@@ -1008,6 +1038,7 @@ export function createWorld(container,state,callback) {
       if(d<2) candidates.push({d:d*.24,kind:'dungeon',id:cave.id,label:'Enter '+cave.name,hint:'Explore the underground passages'});
     }
     const homeRoom=valley&&propertyArea(p,realm,state.homestead);
+    if(atTowerDoor())return {kind:'tower-exit',label:'Leave tower',hint:'Cottage yard'};
     if(homeRoom&&Object.hasOwn(extensions,homeRoom)){
       const room=extensions[homeRoom];
       const d=distance(...homesteadServicePoint(homeRoom));
@@ -1319,7 +1350,7 @@ export function createWorld(container,state,callback) {
   return {
     get renderer(){return renderer;},
     insideRoom,
-    zoomRoom,
+    zoomRoom,leaveWizardTower,
     toggleFlight,lightLantern,
     combat:combat.action,
     inCombat:combat.isFighting,

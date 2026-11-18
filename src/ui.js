@@ -131,7 +131,8 @@ export function createUI(root, state, actions, hasSave) {
       <div id="flight-status" hidden></div>
       <div id="item-trail-status" hidden></div>
       <button id="flight-button" data-action="flight" class="round" aria-label="Take flight" title="Take flight (F)">${icon('rainbow',20)}</button>
-      <div id="room-camera" role="group" aria-label="Room camera" hidden>
+      <div id="room-camera" role="group" aria-label="Room controls" hidden>
+        <button id="leave-tower" class="pill" data-action="leave-tower" hidden>${icon('arrow-right',17)} Leave tower</button>
         <button class="round" data-action="room-zoom:in" aria-label="Zoom room in" title="Zoom in">${icon('plus',17)}</button>
         <button class="round" data-action="room-zoom:out" aria-label="Zoom room out" title="Zoom out"><span aria-hidden="true">−</span></button>
       </div>
@@ -726,6 +727,7 @@ export function createUI(root, state, actions, hasSave) {
       const launch=el('flight-button');
       launch.hidden=Boolean(room);
       el('room-camera').hidden=!room;
+      el('leave-tower').hidden=room?.kind!=='homestead'||room.id!=='wizardTower';
       launch.setAttribute('aria-label',flight?(landing?'Cancel landing':'Land'):'Take flight');
       launch.title=launch.getAttribute('aria-label')+' (F)';
       const cue=el('flight-status');

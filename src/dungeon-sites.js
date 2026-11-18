@@ -2,7 +2,7 @@
 export const dungeonSites=[
   ["village","Petalwick","valley",-8,-4,1.9296],
   ["ridge","Starglass Ridge","valley",25,-39,2.2143],
-  ["fields","Sunseed Fields","valley",4,35,-1.3045],
+  ["fields","Sunseed Fields","valley",-10,25,0.2268],
   ["mushroom","Chanterelle Hollow","valley",-62,-25,2.2318],
   ["willow","Whisperwillow","valley",-6,-51,-1.222],
   ["cloud","Cloudbell Steps","valley",21,-46,-1.5708],
