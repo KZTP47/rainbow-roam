@@ -17,6 +17,7 @@ import {trackingSelection} from './quest-tracking.js';
 import {kitchen} from './town-life.js';
 import {portraitIds} from './portrait-ids.js';
 import {dungeonEntrances} from './dungeons.js';
+import {currentFriend,evolutionColumns,evolutionIds,evolutionRequirement,friendForm,friendStage} from './evolutions.js';
 
 const panels={
   journal:['book','Quest journal','Find leads and track active quests'],
@@ -49,8 +50,19 @@ const fieldPictures=typeof __ROAM_FIELD_PICTURES__==='string'
 const itemPictures=typeof __ROAM_ITEM_PICTURES__==='string'
   ?__ROAM_ITEM_PICTURES__:new URL(import.meta.env.BASE_URL+'item-portraits.webp',document.baseURI).href;
 
+const evolutionPictures=typeof __ROAM_EVOLUTION_PICTURES__==='string'
+  ?__ROAM_EVOLUTION_PICTURES__:new URL(import.meta.env.BASE_URL+'evolution-portraits.webp',document.baseURI).href;
 const wantedPictures=typeof __ROAM_WANTED_PICTURES__==='string'
   ?__ROAM_WANTED_PICTURES__:new URL(import.meta.env.BASE_URL+'wanted-portraits.webp',document.baseURI).href;
+
+function evolutionPortrait(id,stage,extra=''){
+  const index=evolutionIds.indexOf(id)*3+stage;
+  const rows=Math.ceil(evolutionIds.length*3/evolutionColumns);
+  const x=index%evolutionColumns/(evolutionColumns-1)*100;
+  const y=Math.floor(index/evolutionColumns)/(rows-1)*100;
+  return `<span class="art-tile evolution-art ${extra}" aria-hidden="true"
+    style="--art-x:${x}%;--art-y:${y}%;--art-c:${evolutionColumns*100}%;--art-r:${rows*100}%"></span>`;
+}
 
 function portrait(id,set,extra=''){
   const friendIndex=set==='field'?newFriendIds.indexOf(id):-1;
@@ -90,6 +102,11 @@ export function createUI(root, state, actions, hasSave) {
   root.style.setProperty('--field-pictures','url("'+fieldPictures+'")');
   root.style.setProperty('--item-pictures','url("'+itemPictures+'")');
   root.style.setProperty('--wanted-pictures','url("'+wantedPictures+'")');
+  root.style.setProperty('--evolution-pictures','url("'+evolutionPictures+'")');
+  const friendPortrait=(id,extra)=>{
+    const stage=friendStage(state,id);
+    return stage?evolutionPortrait(id,stage,extra):portrait(id,'field',extra);
+  };
   root.innerHTML=`
     <div id="view" aria-label="Rainbow Roam game world"></div>
     <main id="welcome">
@@ -166,7 +183,7 @@ export function createUI(root, state, actions, hasSave) {
   let opened=null, detail=null, returnFocus=null;
   let saveMessage='',saveMessageKind='',propertyCleanup=null,entryPreviews={};
   const frontier=frontierPanels(state,{action,itemBadge,trackItem,propertyPreview:view=>entryPreviews[view]??=(actions.propertyPreview?.(view)??''),wantedBadge:id=>portrait(id,'wanted')});
-  const town=createTownPanel(state,{action,itemBadge,trackItem,fieldBadge:id=>portrait(id,'field'),activityContext:actions.activityContext});
+  const town=createTownPanel(state,{action,itemBadge,trackItem,fieldBadge:id=>portrait(id,'field'),friendPortrait,activityContext:actions.activityContext});
   let mini=null, prompt=null, dateText=null, regionKey=null, lastMap=0;
   let trackedMapSource=null;
   let mapTab='world',mapRealm=state.realm,mapPlace=null,craftTab='all',wardrobeTab='appearance',portraitView='full';
@@ -221,7 +238,8 @@ export function createUI(root, state, actions, hasSave) {
     const id=state.active, buddy=el('buddy');
     buddy.hidden=!id;
     el('spellbook-link').hidden=!state.magic.known.length&&state.realm!=='hogwarts';
-    buddy.innerHTML=id?`<span style="--buddy:${species[id].accent}">${icon('paw',20)}</span><div><small>COMPANION</small><strong>${species[id].name}</strong></div>`:'';
+    const form=currentFriend(state,id);
+    buddy.innerHTML=form?`<span style="--buddy:${form.accent}">${icon('paw',20)}</span><div><small>COMPANION</small><strong>${form.name}</strong></div>`:'';
   }
 
   function crafting() {
@@ -289,28 +307,107 @@ export function createUI(root, state, actions, hasSave) {
     }).join('')||(!commissions?'<p class="folio-empty">No active quests. Check this expedition for someone to meet.</p>':'')}</div>`;
   }
 
-  let friendFilter='new';
+  let friendFilter=null, evolutionId=null, evolutionQuery='';
+  const friendTabs=[
+    ['new','New friends'],['local','Nearby'],['bonded','Befriended'],['all','All creatures'],['evolutions','Evolution chart']
+  ];
+  const renderFriendTabs=()=>`<div class="tab-row folio-tabs">${friendTabs.map(([id,label])=>
+    `<button data-action="friend-filter:${id}" aria-pressed="${friendFilter===id}">${label}</button>`).join('')}</div>`;
+  const orderedLineages=evolutionIds.toSorted((a,b)=>species[a].name.localeCompare(species[b].name));
+
+  function evolutionChart(){
+    const id=evolutionId??state.active??(state.companions.includes('pearly')?'pearly':state.companions[0]??'pearly');
+    const forms=[0,1,2].map(stage=>friendForm(id,stage));
+    const stage=friendStage(state,id), owned=state.companions.includes(id);
+    const careAvailable=owned&&state.bounties.abducted?.pet!==id&&state.townLife.trip?.pet!==id;
+    const rows=orderedLineages.map(baseId=>{
+      const base=species[baseId], middle=friendForm(baseId,1), final=friendForm(baseId,2);
+      return `<li data-evolution-row data-search="${[base.name,middle.name,final.name,base.family,base.place].join(' ').toLowerCase()}">
+        <button data-action="show-lineage:${baseId}" aria-current="${id===baseId?'true':'false'}">
+          <strong>${base.name}</strong><span>${middle.name}</span><span>${final.name}</span>
+        </button></li>`;
+    }).join('');
+    return `${renderFriendTabs()}
+      <div class="evolution-search">
+        <label for="evolution-search">Find an evolution line</label>
+        <input id="evolution-search" type="search" placeholder="Search by name, family, or habitat" autocomplete="off">
+        <p class="evolution-results" aria-live="polite"></p>
+      </div>
+      <section class="evolution-lineage" aria-labelledby="lineage-title" data-lineage="${id}">
+        <div class="lineage-header"><div><h3 id="lineage-title" tabindex="-1">${forms[0].name}’s evolution line</h3>
+          <p>${forms[0].family} · ${forms[0].place}</p></div>
+          ${careAvailable&&stage<2?action('Companion care','care-for:'+id,'heart','','small-action'):''}</div>
+        <ol class="evolution-stages">
+        ${forms.map((form,index)=>{
+          const req=evolutionRequirement(state,id,index);
+          const obtained=owned&&index<=stage;
+          const current=owned&&index===stage;
+          const status=current?'Current form':obtained?'Unlocked':index===0?'Wild form':req.ready?'Ready to evolve':'Locked';
+          const offering=req&&items[req.item][0];
+          return `<li class="evolution-stage" data-stage="${index+1}" ${current?'aria-current="step"':''} style="--form-accent:${form.accent}">
+            ${index?`<span class="evolution-arrow" aria-hidden="true">${icon('arrow-right',17)}</span>`:''}
+            ${evolutionPortrait(id,index,'evolution-stage-art')}
+            <div class="evolution-stage-copy"><small>Stage ${index+1} · ${status}</small>
+              <h4${current?' tabindex="-1"':''}>${form.name}</h4><p>${form.lore}</p></div>
+            <div class="evolution-requirements">
+              ${req?`<strong>From ${forms[index-1].name}</strong>
+                <span>${icon('heart',14)} ${req.affinity} friendship${owned&&!obtained?` · ${Math.min(req.friendship,req.affinity)}/${req.affinity}`:''}</span>
+                <span>${icon(items[req.item][1],14)} Offer ${req.count} × ${offering}${owned&&!obtained?` · ${req.stock} in bag`:''}</span>
+                ${req.away&&!obtained?'<span>Wait for your friend to return.</span>':''}
+                ${owned&&index===stage+1?action('Evolve','evolve-friend:'+id+'/'+index,'sparkles',`aria-label="Evolve into ${form.name}" ${req.ready?'':'disabled'}`,'small-action evolution-button'):''}`
+                :`<strong>Befriend in ${form.place}</strong><span>Offer ${form.trust} × ${items[form.favorite][0]}</span>`}
+            </div>
+          </li>`;
+        }).join('')}
+        </ol>
+        <p class="evolution-hint">Pet, feed, or play with your friend to raise friendship. Evolving uses the listed offering.</p>
+      </section>
+      <section class="evolution-browser" aria-label="Browse evolution lines">
+        <ul class="evolution-index">${rows}</ul>
+      </section>`;
+  }
+
+  function filterEvolutions(search){
+    const query=evolutionQuery.trim().toLowerCase();
+    let hits=0;
+    for(const row of overlay.querySelectorAll('[data-evolution-row]')){
+      row.hidden=!row.dataset.search.includes(query);
+      if(!row.hidden) hits++;
+    }
+    const results=search.parentElement.querySelector('.evolution-results');
+    results.textContent=hits===0?'No matching evolution lines':`${hits} ${hits===1?'line':'lines'}`;
+    const lineage=overlay.querySelector('.evolution-lineage');
+    const browser=overlay.querySelector('.evolution-browser');
+    browser.hidden=hits===0;
+    if(query&&lineage.previousElementSibling!==browser) lineage.before(browser);
+    if(!query&&lineage.nextElementSibling!==browser) lineage.after(browser);
+  }
+
   function companions() {
-    const filters=[['new','New friends'],['local','Nearby'],['bonded','Befriended'],['all','All creatures']];
+    friendFilter??=state.companions.length?'bonded':'new';
+    if(friendFilter==='evolutions') return evolutionChart();
     const roster=Object.entries(species).filter(([id,spec])=>
       friendFilter==='all'||(friendFilter==='new'?spec.reefIcon||Object.hasOwn(friendHabitats,id):friendFilter==='local'?spec.place===regions[regionKey]?.name:state.companions.includes(id))
     );
-    const active=state.active&&species[state.active];
+    const active=currentFriend(state,state.active);
     return `<div class="folio-feature field-guide-feature">
-      ${active?portrait(state.active,'field','feature-specimen'):`<span class="chapter-illustration">${icon('paw',34)}</span>`}
+      ${active?friendPortrait(state.active,'feature-specimen'):`<span class="chapter-illustration">${icon('paw',34)}</span>`}
       <div><strong>${active?active.name+' is roaming with you':'Friends of Far Horizons'}</strong>
       <p>${state.companions.length} of ${Object.keys(species).length} befriended · Check a creature’s favorite offering before approaching.</p></div>
       ${active?action('Companion care','care','heart','','small-action'):''}</div>
-      <div class="tab-row folio-tabs">${filters.map(([id,label])=>`<button data-action="friend-filter:${id}" aria-pressed="${friendFilter===id}">${label}</button>`).join('')}</div>
-      <div class="companion-list folio-grid">${roster.map(([id,spec])=>{
+      ${renderFriendTabs()}
+      <div class="companion-list folio-grid">${roster.map(([id,base])=>{
+      const spec=currentFriend(state,id);
       const befriended=state.companions.includes(id),missing=state.bounties.abducted?.pet===id;
       const away=state.townLife.trip?.pet===id;
       return `<article class="companion-card folio-friend" style="--fur:${spec.color};--accent:${spec.accent}">
-        <div class="friend-plate">${portrait(id,'field','specimen')}${befriended?`<span class="friend-attached">${icon(missing?'pin':'heart',14)}</span>`:''}</div>
+        <div class="friend-plate">${friendPortrait(id,'specimen')}${befriended?`<span class="friend-attached">${icon(missing?'pin':'heart',14)}</span>`:''}</div>
         <div class="friend-description"><strong>${spec.name}</strong><small>${spec.family} · ${spec.place}</small>
         ${befriended?`<p>${spec.lore}</p>`:`<p class="offering">${portrait(spec.favorite,'item','ingredient-art')}
           Likes ${items[spec.favorite][0].toLowerCase()} · ${spec.trust} ${spec.trust===1?'offering':'offerings'} ${trackItem(spec.favorite)}</p>`}
         ${!befriended&&Object.hasOwn(friendHabitats,id)?action('Visit '+spec.place,'visit-friend:'+id,'map','','small-action'):''}
+        ${spec!==base?`<small>Stage ${friendStage(state,id)+1} · ${base.name} line</small>`:''}
+        ${action('Evolution line','show-lineage:'+id,'sparkles','','small-action friend-line-button')}
         ${missing?'<strong class="missing-friend">Missing · See the bounty board</strong>':away?'<strong>Out foraging · Check expeditions</strong>':befriended?`<div class="companion-actions"><button data-action="buddy:${id}" class="small-action companion-button" aria-label="${state.active===id?'Send to rest':'Roam together'}">${icon(state.active===id?'moon':'paw',14)} ${state.active===id?'Rest':'Roam'}</button>
           <button data-action="care-for:${id}" class="small-action" aria-label="Care for ${spec.name}">${icon('heart',14)} Care</button></div>`:''}</div></article>`;
     }).join('')||'<p class="folio-empty">No creatures are listed here. Try a different tab or explore another place.</p>'}</div>`;
@@ -402,14 +499,14 @@ export function createUI(root, state, actions, hasSave) {
   }
 
   function companionCare(){
-    const id=state.active,spec=species[id];
+    const id=state.active,spec=currentFriend(state,id);
     if(!spec) return `<p class="muted">Choose a befriended creature to roam with you.</p>${action('Open field guide','companions','paw','','panel-link')}`;
     const history=state.care[id]??{affinity:0};
     const food=[...cropFood,...Object.keys(kitchen)].filter(id=>state.inventory[id]>0).map(id=>
       `<div class="item-inline-actions">${action('Feed '+items[id][0].toLowerCase(),'feed-crop:'+id,'sprout',history.resting?'disabled':'','small-action')}${trackItem(id)}</div>`).join('');
     const affinity=history.affinity,label=history.resting?'Taking a nap':affinity>=8?'Inseparable':affinity>=3?'Trusting you':'Getting to know you';
     return `<div class="care-profile" style="--pet:${spec.accent}">
-      ${portrait(id,'field','care-art')}<div><strong>${spec.name}</strong><small>${label}</small></div>
+      ${friendPortrait(id,'care-art')}<div><strong>${spec.name}</strong><small>${label}</small></div>
       </div><div class="affinity"><label for="affinity-meter">Friendship</label><meter id="affinity-meter" min="0" max="12" value="${affinity}"></meter><span>${affinity} / 12</span></div>
       <div class="care-buttons">
         ${action('Pet','pet-care:pet','heart',history.resting?'disabled':'','small-action')}
@@ -419,7 +516,7 @@ export function createUI(root, state, actions, hasSave) {
         ${action('Scout for materials','pet-care:scout','compass',history.resting||affinity<3?'disabled':'','small-action')}
         ${action('Meet local wildlife','pet-care:meet','paw',history.resting?'disabled':'','small-action')}
         ${food}
-      </div>${affinity<3?'<p class="muted">Reach 3 friendship to scout for nearby materials together.</p>':''}`;
+      </div>${action('Evolution line','show-lineage:'+id,'sparkles','','panel-link')}${affinity<3?'<p class="muted">Reach 3 friendship to scout for nearby materials together.</p>':''}`;
   }
 
   function sorting(){
@@ -571,13 +668,23 @@ export function createUI(root, state, actions, hasSave) {
     const chart=el('worldchart');
     if(chart) paintWorldChart(chart);
     if(opened==='settings') renderSaveMessage();
+    const search=el('evolution-search');
+    if(search) {search.value=evolutionQuery;filterEvolutions(search);}
     if(opened==='homestead'){
       const walk=overlay.querySelector('.property-walk');
       if(walk) propertyCleanup=mountPropertyWalk(walk,state,{start:frontier.propertyView(),renderer:actions.walkRenderer(),
         edit:(view,slot)=>{frontier.editProperty(view,slot);drawPanel();}});
     }
     if(opened==='wardrobe') actions.drawOutfit(el('outfit-preview'),portraitView);
-    if(focused) [...overlay.querySelectorAll('button')].find(b=>b.dataset.action===focused&&!b.disabled)?.focus({preventScroll:true});
+    if(focused){
+      const button=[...overlay.querySelectorAll('button')].find(b=>b.dataset.action===focused&&!b.disabled);
+      if(button) button.focus({preventScroll:true});
+      else if(focused.startsWith('evolve-friend:')){
+        const form=overlay.querySelector('.evolution-stage[aria-current="step"] h4');
+        form?.focus({preventScroll:true});
+        form?.closest('.evolution-stage').scrollIntoView({block:'nearest'});
+      }
+    }
   }
 
   function renderBuild(building, valid) {
@@ -617,7 +724,16 @@ export function createUI(root, state, actions, hasSave) {
       if(key==='wardrobe-tab') {wardrobeTab=id;drawPanel();return;}
       if(key==='portrait-view') {portraitView=portraitView==='full'?'face':'full';drawPanel();return;}
       if(key==='journal-scope') {journalScope=id;drawPanel();return;}
-      if(key==='friend-filter') {friendFilter=id;drawPanel();return;}
+      if(key==='friend-filter') {
+        friendFilter=id;overlay.querySelector('.panel-body').scrollTop=0;drawPanel();return;
+      }
+      if(key==='show-lineage'&&evolutionIds.includes(id)){
+        evolutionId=id;evolutionQuery='';friendFilter='evolutions';
+        showPanel('companions');
+        overlay.querySelector('.panel-body').scrollTop=0;
+        el('lineage-title').focus({preventScroll:true});
+        return;
+      }
       if(frontier.select(key,id)) {
         drawPanel();
         if(key==='bounty-file') overlay.querySelector('.bounty-dossier')?.scrollIntoView({block:'nearest'});
@@ -629,6 +745,11 @@ export function createUI(root, state, actions, hasSave) {
     } else if(event.target===overlay) actions.action('close');
   });
   overlay.addEventListener('input',event=>{
+    if(event.target.id==='evolution-search'){
+      evolutionQuery=event.target.value;
+      filterEvolutions(event.target);
+      return;
+    }
     if(!event.target.matches('[data-item-search]')) return;
     const query=event.target.value.trim().toLowerCase();
     let matches=0;
@@ -747,7 +868,7 @@ export function createUI(root, state, actions, hasSave) {
         const distance=Math.round(Math.hypot(p.x-target.x,p.z-target.z));
         const island=state.realm==='sky'&&!named?stop.name:stop.name+' · '+bearing+' · '+distance+' m';
         const text=swimming?'Swimming':
-          (landing?'Descending':state.transit.mount?'Riding '+species[state.transit.mount].name:'Flying')+' · '+y+' m';
+          (landing?'Descending':state.transit.mount?'Riding '+currentFriend(state,state.transit.mount).name:'Flying')+' · '+y+' m';
         if(cue.dataset.status!==text+'|'+island){
           cue.dataset.status=text+'|'+island;
           cue.innerHTML=`<strong>${text}</strong>${flight?`<small>${island}</small><em>Space climb · X descend</em>`:''}`;

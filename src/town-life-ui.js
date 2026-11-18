@@ -2,6 +2,7 @@
 import {icon} from './icons.js';
 import {items,species,regions} from './content.js';
 import {townServicesForPlace} from './town-data.js';
+import {currentFriend} from './evolutions.js';
 import {activities,errands,routes,deliveries,kitchen,salvage,blessings,caches,cacheDistance,ownsStock,photoLimit} from './town-life.js';
 
 const location=id=>regions[id]?.name??id;
@@ -11,7 +12,7 @@ const serviceIcons={hall:'book',post:'pin',workshop:'hammer',garden:'sprout',loo
 const activityById=Object.fromEntries(activities.map(([id,...info])=>[id,info]));
 const length=record=>Object.keys(record).length;
 
-export function createTownPanel(state,{action,itemBadge,trackItem,fieldBadge,activityContext}){
+export function createTownPanel(state,{action,itemBadge,trackItem,fieldBadge,friendPortrait,activityContext}){
   let current=null,ready=false;
   const run=(label,verb,id,symbol,ok=true)=>
     action(label,'activity-run:'+verb+(id===undefined?'':'.'+id),symbol,
@@ -79,14 +80,14 @@ export function createTownPanel(state,{action,itemBadge,trackItem,fieldBadge,act
   function expeditions(ctx){
     const trip=state.townLife.trip;
     ready=Boolean(trip&&trip.readyAt<=Date.now());
-    if(trip) return (ctx.post?'':unavailable('a post office'))+cards(drawCard(species[trip.pet].name,
+    if(trip) return (ctx.post?'':unavailable('a post office'))+cards(drawCard(currentFriend(state,trip.pet).name,
       `<p>${ready?'Back from '+location(trip.place):'Foraging near '+location(trip.place)}</p><p>${ready?'Collect the supplies at a post office.':'Your friend will return soon with local supplies.'}</p>`,
-      run('Collect expedition supplies','collect-trip',undefined,'bag',ctx.post&&ready),fieldBadge(trip.pet)));
+      run('Collect expedition supplies','collect-trip',undefined,'bag',ctx.post&&ready),friendPortrait(trip.pet)));
     const eligible=state.companions.filter(id=>id!==state.active&&id!==state.bounties.abducted?.pet);
     if(!eligible.length) return note('Befriend a creature, then use Send to rest in the Field Guide to make them available for a trip.');
     return (ctx.post?'':unavailable('a post office'))+note('Bring one meadow biscuit and choose a friend who stayed behind.')+
-      cards(eligible.map(id=>drawCard(species[id].name,`<p>${name('treat')} · Forages for about 20 seconds. ${trackItem('treat')}</p>`,
-        run('Send '+species[id].name,'send',id,'paw',ctx.post&&ownsStock(state,{treat:1})),fieldBadge(id))).join(''));
+      cards(eligible.map(id=>drawCard(currentFriend(state,id).name,`<p>${name('treat')} · Forages for about 20 seconds. ${trackItem('treat')}</p>`,
+        run('Send '+currentFriend(state,id).name,'send',id,'paw',ctx.post&&ownsStock(state,{treat:1})),friendPortrait(id))).join(''));
   }
   function album(){
     const photos=state.townLife.photos;

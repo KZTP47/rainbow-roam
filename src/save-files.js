@@ -1,4 +1,5 @@
 import {items,recipes,species,regions,villagers,newGame,SAVE_KEY} from './content.js';
+import {evolutionIds} from './evolutions.js';
 import {atlas,homeland,houses,spells} from './horizons.js';
 import {normalizeLook} from './wardrobe.js';
 import {normalizeHomestead} from './homestead.js';
@@ -70,6 +71,8 @@ export function normalizeSave(saved){
       ? {mode,y:number(saved.transit.y,0,-100,110),mount:companions.includes(mount)&&mount!==bounties.abducted?.pet&&mount!==townLife.trip?.pet?mount:null}
       : null,
     look:normalizeLook(saved.look),time:number(saved.time,8,0,24)%24,sound:saved.sound!==false,
+    evolutions:filtered(saved.evolutions,companions.filter(id=>evolutionIds.includes(id)),
+      stage=>stage===1||stage===2?stage:undefined),
     stamp:filtered(saved.stamp,regionIds,v=>v===true||v===1?true:undefined),
     care:filtered(saved.care,speciesIds,record=>isRecord(record)?{
       affinity:Math.min(12,counter(record.affinity)),resting:record.resting===true,

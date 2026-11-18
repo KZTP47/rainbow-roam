@@ -2,7 +2,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {build} from 'vite';
 
 const htmlPath = new URL('../index.html', import.meta.url);
-const [source, cover, favicon, fieldPictures, itemPictures, wantedPictures, friendPictures, ...licenses] = await Promise.all([
+const [source, cover, favicon, fieldPictures, itemPictures, wantedPictures, friendPictures, evolutionPictures, ...licenses] = await Promise.all([
   readFile(htmlPath, 'utf8'),
   readFile(new URL('../public/roam-cover.webp', import.meta.url), 'base64'),
   readFile(new URL('../public/roam.svg', import.meta.url), 'base64'),
@@ -10,6 +10,7 @@ const [source, cover, favicon, fieldPictures, itemPictures, wantedPictures, frie
   readFile(new URL('../public/item-portraits.webp',import.meta.url),'base64'),
   readFile(new URL('../public/wanted-portraits.webp',import.meta.url),'base64'),
   readFile(new URL('../public/new-friends.webp',import.meta.url),'base64'),
+  readFile(new URL('../public/evolution-portraits.webp',import.meta.url),'base64'),
   ...['three', 'fraunces', 'nunito'].map(name =>
     readFile(new URL('../public/licenses/' + name + '.txt', import.meta.url), 'utf8'))
 ]);
@@ -25,6 +26,7 @@ const bundle = await build({
   define: {
     __ROAM_OFFLINE_COVER__:JSON.stringify('data:image/webp;base64,'+cover),
     __ROAM_NEW_FRIENDS__:JSON.stringify('data:image/webp;base64,'+friendPictures),
+    __ROAM_EVOLUTION_PICTURES__:JSON.stringify('data:image/webp;base64,'+evolutionPictures),
     __ROAM_FIELD_PICTURES__:JSON.stringify('data:image/webp;base64,'+fieldPictures),
     __ROAM_ITEM_PICTURES__:JSON.stringify('data:image/webp;base64,'+itemPictures),
     __ROAM_WANTED_PICTURES__:JSON.stringify('data:image/webp;base64,'+wantedPictures)

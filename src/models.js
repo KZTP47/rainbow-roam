@@ -1,5 +1,6 @@
 import * as T from 'three';
 import {celMaterial,inkSilhouette} from './cel.js';
+import {addEvolutionShape} from './evolution-model.js';
 
 const palette = new Map();
 const sphere = new T.SphereGeometry(1, 16, 12);
@@ -52,11 +53,19 @@ export function creature(spec) {
   const group = new T.Group();
   const model = new T.Group();
   group.add(model);
-  const {kind,color,accent} = spec;
+  const {kind,accent,evolution} = spec;
+  const stage=evolution?.stage??0;
+  const color=stage?'#'+new T.Color(spec.color).lerp(new T.Color(accent),stage===1?.15:.31).getHexString():spec.color;
   const legs = [];
   const head = new T.Group();
   const tail = new T.Group();
   model.add(head,tail);
+  const finish = (extras={}) => {
+    const actor={group,model,legs,tail,head,kind,...extras};
+    addEvolutionShape(actor,spec,part,material,branch);
+    inkSilhouette(model);
+    return actor;
+  };
   if(kind==='belljelly'){
     head.position.y=.84;
     part(head,'fine',color,0,0,0,.48,.37,.46);
@@ -76,7 +85,7 @@ export function creature(spec) {
       head.scale.set(1+.06*pulse,1-.10*pulse,1+.06*pulse);
       frills.forEach((f,i)=>{f.rotation.z=.24*Math.sin(beat+i*.7);f.rotation.x=.16*Math.cos(beat+i);});
     };
-    inkSilhouette(model);return {group,model,legs,tail,head,kind,pose};
+    return finish({pose});
   }
   if (kind === 'unicorn') {
     part(model,'fine',color,0,.99,-.24,.5,.44,.7);
@@ -100,7 +109,8 @@ export function creature(spec) {
     }
     const mane = ['#f89db7',accent,'#ba9eea','#98dcc4','#ffd88c','#f5a0c7'];
     for (let i=0;i<8;i++) {
-      part(head,'fine',mane[i%mane.length],-.28+Math.sin(i*.63)*.19,.27-i*.097,.27-i*.053,.135,.255,.119,.39,0,-.49+Math.sin(i)*.25);
+      part(head,'fine',mane[i%mane.length],-.28+Math.sin(i*.63)*.19,.27-i*(.097+stage*.009),.27-i*.053,
+        .135+stage*.011,.255+stage*.056,.119+stage*.014,.39,0,-.49+Math.sin(i)*.25);
     }
     for (let i=0;i<3;i++) part(head,'fine',mane[i],-.13+i*.113,.334,.412-i*.02,.11,.15,.145,.04,0,-.87);
     tail.position.set(0,1.17,-.79);
@@ -108,17 +118,18 @@ export function creature(spec) {
     for (const x of [-.29,.29]) for (const z of [-.59,.28]) {
       const leg = new T.Group(); leg.position.set(x,.91,z); model.add(leg); legs.push(leg);
       part(leg,'fine',color,0,-.37,0,.141,.44,.15);
-      part(leg,'fine','#d8a7ab',0,-.741,.026,.15,.136,.157);
+      part(leg,'fine',stage?accent:'#d8a7ab',0,-.741,.026,.15,.136,.157);
     }
   } else if(['silkskip','rollbud','pealfoot'].includes(kind)){
     let pose;
+    const wings=[];
     if(kind==='silkskip'){
       part(model,'fine',color,0,.46,0,.33,.19,.59);
       head.position.set(0,.48,.36);
       part(head,'fine',color,0,0,.03,.33,.18,.26);eyes(head,.16,.05,.21,.059);
       const fins=[],ribbons=[];
       for(const side of [-1,1]){
-        const fin=new T.Group();fin.position.set(side*.22,.47,-.04);model.add(fin);fins.push(fin);
+        const fin=new T.Group();fin.position.set(side*.22,.47,-.04);model.add(fin);fins.push(fin);wings.push(fin);
         part(fin,'diamond',color,side*.37,0,-.08,.61,.095,.41,0,side*.29);
         part(fin,'diamond',accent,side*.72,.018,-.16,.30,.064,.17,0,side*.38);
         for(let j=0;j<3;j++)part(fin,'sphere',white,side*(.24+j*.13),.074,-.04-j*.034,.044,.018,.061);
@@ -169,7 +180,7 @@ export function creature(spec) {
         model.position.y=hop*hop*(moving?.47:.14);model.rotation.x=-hop*.18;
         throat.scale.y=.13+.093*(1+Math.sin(t*4));throat.scale.z=.19+.061*(1+Math.sin(t*4));};
     }
-    inkSilhouette(model);return {group,model,legs,tail,head,kind,pose};
+    return finish({pose,wings});
   } else if(kind==='snail'){
     part(model,'fine',color,0,.24,-.03,.38,.24,.73);
     part(model,'fine','#e3dba4',0,.14,.08,.36,.12,.64);
@@ -205,8 +216,8 @@ export function creature(spec) {
     eyes(head,.223,.048,.289,.078);
     part(head,'sphere',ink,0,-.086,.461,.047,.034,.027);
     for (const sign of [-1,1]) {
-      part(head,fox?'cone':'fine',color,sign*.235,fox?.33:.462,-.032,fox?.156:.116,fox?.36:.31,.106,0,0,sign*-.27);
-      part(head,'fine','#efadc2',sign*.253,fox?.334:.482,.047,fox?.07:.057,fox?.09:.21,.052,0,0,sign*-.26);
+      part(head,fox?'cone':'fine',color,sign*.235,fox?.33:.462,-.032,fox?.156:.116,fox?.36+stage*.022:.31+stage*.062,.106,0,0,sign*-.27);
+      part(head,'fine','#efadc2',sign*.253,fox?.334:.482,.047,fox?.07:.057,fox?.09:.21+stage*.044,.052,0,0,sign*-.26);
     }
     tail.position.set(0,.54,-.51);
     part(tail,'fine',fox?color:accent,0,.12,fox?-.3:-.09,fox?.28:.22,fox?.264:.2,fox?.5:.235,-.37);
@@ -250,8 +261,7 @@ export function creature(spec) {
         }
       }
     }
-    inkSilhouette(model);
-    return {group,model,legs,tail,head,kind,wings,flying};
+    return finish({wings,flying});
   } else if (['bee','moth','owl','dragon','mouse','hedgehog','turtle'].includes(kind)) {
     const flying=['bee','moth','owl'].includes(kind);
     const round=kind==='owl'||kind==='bee';
@@ -311,8 +321,7 @@ export function creature(spec) {
       tail.position.set(0,.27,-.59);
       for(let i=0;i<6;i++) part(tail,'sphere',i===5?accent:color,i*.062,.01+i*i*.007,-i*.088,.096-i*.008,.089-i*.009,.105-i*.008);
     }
-    inkSilhouette(model);
-    return {group,model,legs,tail,head,kind,wings,flying};
+    return finish({wings,flying});
   } else {
     const flying = kind==='sprite';
     part(model,'fine',color,0,.3,-.19,.35,.267,.6);
@@ -321,7 +330,7 @@ export function creature(spec) {
     part(head,'fine','#ffd8ea',0,-.102,.265,.29,.128,.14);
     eyes(head,.229,.061,.276,.079);
     for (const sign of [-1,1]) for (let i=0;i<3;i++) {
-      const wing=part(head,'fine',i===1?accent:color,sign*(.46+i*.083),.15+i*.108,-.12-i*.035,.094,.2-i*.029,.067,0,0,sign*(-.83+i*.29));
+      const wing=part(head,'fine',i===1?accent:color,sign*(.46+i*(.083+stage*.03)),.15+i*(.108+stage*.015),-.12-i*.035,.094+stage*.02,.2-i*.029+stage*.04,.067,0,0,sign*(-.83+i*.29));
       if (flying) wing.scale.multiplyScalar(1.2);
     }
     tail.position.set(0,.33,-.58);
@@ -331,8 +340,7 @@ export function creature(spec) {
       part(leg,'fine',color,0,-.08,.026,.118,.084,.156);
     }
   }
-  inkSilhouette(model);
-  return {group, model, legs, tail, head, kind};
+  return finish();
 }
 
 export function person(colors, lead=false, variant=0, look=null) {

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4175",
     "build": "vite build && node scripts/build-offline.mjs",
-    "preview": "vite preview --host 127.0.0.1 --port 4175"
+    "preview": "vite preview --host 127.0.0.1 --port 4175",
+    "preplaytest": "npm run build",
+    "playtest": "node scripts/playtest.mjs"
   },
   "dependencies": {
     "@fontsource/fraunces": "^5.3.0",

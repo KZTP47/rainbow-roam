@@ -25,6 +25,7 @@ import {regionalRoomById,regionalRoomsFor,townServiceAt,townWater} from './town-
 import {populateTown} from './towns.js';
 import {icon} from './icons.js';
 import {items,species,wildlife,villagers,resourceSpots,regionAt} from './content.js';
+import {currentFriend,friendStage} from './evolutions.js';
 import {inRiver,riverLevel,silverrunWalls,spirehavenCitizens} from './silverrun.js';
 import {coastRiverY,inCoastRiver,pierAt,seaHeight} from './silvercoast.js';
 import {atStairs,canMoveOnShip,gangplank,inHold,marigold,onMarigold,onShip,stairs,switchDeck} from './marigold.js';
@@ -162,7 +163,7 @@ export function createWorld(container,state,callback) {
   const stream=streamLandscape(scene,realm,state);
   const homestead=callback.makeHomestead?.(scene,realm,terrainHeight);
   const altitude=geography[realm].altitude??0;
-  let flightMount=null,mountId=null,landing=false;
+  let flightMount=null,mountId=null,mountStage=0,landing=false;
   const kite=new T.Group();
   scene.add(kite);kite.visible=false;
   for(const side of [-1,1]){
@@ -192,7 +193,7 @@ export function createWorld(container,state,callback) {
   const inSpirehaven=({x,z})=>realm==='silverrun'&&x>silverrunWalls.west&&x<silverrunWalls.east&&z>silverrunWalls.north&&z<silverrunWalls.south;
   let pitch=inSpirehaven(state.player)?.08:.24, distance=9.6;
   let active=false, paused=false, contextLost=false, needsRender=true;
-  let buddy=null,buddyId=null,followTarget=null;
+  let buddy=null,buddyId=null,buddyStage=0,followTarget=null;
   let building=false,selected=null,rotation=0,preview=null,previewType=null;
   let elapsed=0,lastFrame=0,prevUi=0,prevSun=0,freeLookUntil=0;
   let keys=new Set(),gesture=null, mouseAim=false;
@@ -469,16 +470,19 @@ export function createWorld(container,state,callback) {
   resize();
 
   function syncBuddy() {
-    if(buddyId===state.active) return;
+    const stage=friendStage(state,state.active);
+    if(buddyId===state.active&&buddyStage===stage) return;
+    const prior=buddyId===state.active?buddy:null;
     if(buddy) scene.remove(buddy.look.group,buddy.shadow);
     buddy=null;petAction=null;
-    buddyId=state.active;
+    buddyId=state.active;buddyStage=stage;
     if(!buddyId) return;
-    const data=species[buddyId],look=creature(data);
-    const shadow=addShadow(scene,shadowTexture,data.kind==='unicorn'?.69:.51);
+    const data=currentFriend(state,buddyId),look=creature(data);
+    const shadow=addShadow(scene,shadowTexture,(data.kind==='unicorn'?.69:.51)*look.group.scale.x);
     scene.add(look.group);
     indoorLayers(look.group);indoorLayers(shadow);
-    buddy={look,shadow,x:state.player.x+1.3,z:state.player.z+1.7,seed:103};
+    buddy={look,shadow,x:prior?.x??state.player.x+1.3,z:prior?.z??state.player.z+1.7,seed:103};
+    if(prior) look.group.rotation.copy(prior.look.group.rotation);
   }
 
   const ball=part(scene,'fine','#eec888',0,0,0,.104,.104,.104);
@@ -773,11 +777,12 @@ export function createWorld(container,state,callback) {
     if(swimming){
       player.arms.forEach((arm,index)=>{arm.rotation.x=-.75+Math.sin(t*5.5+index*Math.PI)*.65;});
     }
-    if(inFlight&&state.transit.mount&&state.transit.mount!==mountId){
+    const riding=inFlight?state.transit.mount:null;
+    if(riding&&(riding!==mountId||friendStage(state,riding)!==mountStage)){
       if(flightMount) scene.remove(flightMount.group);
-      mountId=state.transit.mount;
-      flightMount=creature({...species[mountId],flight:true});
-      flightMount.group.scale.setScalar(2.03);scene.add(flightMount.group);
+      mountId=riding;mountStage=friendStage(state,riding);
+      flightMount=creature({...currentFriend(state,mountId),flight:true});
+      flightMount.group.scale.multiplyScalar(2.03);scene.add(flightMount.group);
     }
     if(flightMount) flightMount.group.visible=Boolean(inFlight&&state.transit.mount);
     if(flightMount?.group.visible){

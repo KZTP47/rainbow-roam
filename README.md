@@ -30,6 +30,8 @@ npm run dev
 
 Move with **WASD** or the arrow keys, drag to look, and press **E** to interact. Use **M** for the map and **V** for the Voyage Atlas. Touch controls appear on mobile.
 
+Open **Friends → Evolution chart** to look up every three-stage companion line. Pet, feed, or play with a befriended companion to earn friendship, then choose **Evolve** when you have the listed offering.
+
 Run `npm run build` to create the web build in `dist/` and the offline **Rainbow Roam.html**. Serve the web build over HTTPS or localhost. Progress saves in your browser. A second window waits for the active window to close before loading your save.
 
 Third-party library and font notices are in [public/licenses](public/licenses).

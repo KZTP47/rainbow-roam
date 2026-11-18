@@ -3,6 +3,7 @@ import {animate,part,branch,creature} from './models.js';
 import {human,disposeHuman} from './human.js';
 import {geography} from './overworld.js';
 import {leaveBanditLoot} from './loot.js';
+import {currentFriend} from './evolutions.js';
 
 const wanted=[
   ['bramble','Dell Bramble','Apple Road Tollkeeper','valley',-19,34,'sabre',22,'Look for the old apple baskets where Sunseed Fields meets the western footpath.'],
@@ -218,7 +219,7 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
   const hints=()=>{
     const missing=progress.abducted;
     const tracked=lookup[progress.target];
-    if(missing) return 'Rescue '+(species[missing.pet]?.name??'your friend')+' · '+geography[missing.realm].title+
+    if(missing) return 'Rescue '+(currentFriend(state,missing.pet)?.name??'your friend')+' · '+geography[missing.realm].title+
       (missing.realm===realm?markDirection(missing):'');
     if(tracked) return 'Wanted · '+tracked.name+' · '+geography[tracked.realm].title+
       (tracked.realm===realm?markDirection(tracked):'');
@@ -333,7 +334,7 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
       scene.add(camp);
     }
     if(mode==='rescue'&&species[progress.abducted?.pet]){
-      rescueModel=creature(species[progress.abducted.pet]);scene.add(rescueModel.group);
+      rescueModel=creature(currentFriend(state,progress.abducted.pet));scene.add(rescueModel.group);
       rescueModel.group.scale.setScalar(.78);
       const x=where.x-1.85,z=where.z+.47;
       rescueModel.group.position.set(x,terrainHeight(x,z),z);
@@ -388,7 +389,7 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
     state.wallet.badges=(state.wallet.badges??0)+badges;
     progress.raidClock=0;
     clearEnemy();relief=15;
-    say(rescue?(species[missing.pet]?.name??'Your friend')+' is safe':bounty?'Bounty captured':'Thief chased off',
+    say(rescue?(currentFriend(state,missing.pet)?.name??'Your friend')+' is safe':bounty?'Bounty captured':'Thief chased off',
       'Pick up the sparkling spoils nearby'+(badges?' · +'+badges+' Ranger '+(badges===1?'badge':'badges'):''),rescue?'paw':'check');
   }
   function strike(damage,canGuard=true){
@@ -587,7 +588,7 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
             const hideout=walkPoint(e.data.x,e.data.z)??{x:e.x,z:e.z};
             progress.abducted={pet:stolen,bandit:e.data.id,realm,x:hideout.x,z:hideout.z};
             clearEnemy();relief=13;
-            say((species[stolen]?.name??'Your friend')+' was taken','Follow the rescue trail shown on the bounty board.','paw');
+            say((currentFriend(state,stolen)?.name??'Your friend')+' was taken','Follow the rescue trail shown on the bounty board.','paw');
             return;
           }
           e.grab=false;

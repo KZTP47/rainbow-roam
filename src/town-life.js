@@ -184,7 +184,7 @@ export function townLifeAction(state,verb,id,ctx){
       if(!ctx.post||data.trip||!state.companions.includes(id)||state.active===id||
         state.bounties.abducted?.pet===id||!ownsStock(state,{treat:1})) return null;
       add(state,{treat:1},-1);data.trip={pet:id,place,readyAt:now+20000};
-      return report(ctx.species[id].name+' set out','Return to the expedition counter when your friend is back.','paw');
+      return report((ctx.friendName?.(id)??ctx.species[id].name)+' set out','Return to the expedition counter when your friend is back.','paw');
     }
     case 'collect-trip':{
       const trip=data.trip;
@@ -192,7 +192,7 @@ export function townLifeAction(state,verb,id,ctx){
       const supply=ctx.atlas[ctx.regions[trip.place].realm??'valley']?.material??'wood';
       const count=(state.care[trip.pet]?.affinity??0)>=3?5:3;
       data.trip=null;add(state,{[supply]:count});state.wallet.coins+=4;
-      return report(ctx.species[trip.pet].name+' returned',count+' '+ctx.items[supply][0].toLowerCase()+' and 4 Suncoins.','paw');
+      return report((ctx.friendName?.(trip.pet)??ctx.species[trip.pet].name)+' returned',count+' '+ctx.items[supply][0].toLowerCase()+' and 4 Suncoins.','paw');
     }
     case 'postcard':{
       if(data.photos.length>=photoLimit) return null;

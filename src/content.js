@@ -121,7 +121,7 @@ export const resourceSpots = [
 export function newGame() {
   return {
     version:1, realm:homeland, transit:null, stamp:{}, care:{}, magic:{house:null,known:[],mastered:{}}, look:{...defaultLook}, player:{...START}, inventory:{ treat:1, wood:4, berry:2 }, bonds:{},
-    companions:[], active:null, quests:{poppy:'active'}, crafted:{}, placed:{}, blocks:[],
+    companions:[], evolutions:{}, active:null, quests:{poppy:'active'}, crafted:{}, placed:{}, blocks:[],
     wallet:{coins:30,badges:0},homestead:newHomestead(),loot:[],townLife:newTownLife(),bounties:{target:null,captured:{},abducted:null,raidClock:0},
     spirehaven:{dials:{},aligned:false},roomActivities:{},trails:{},dungeons:newDungeons(),health:5,
     discoveries:['village'], harvested:{}, selected:'plank', trackingItem:null, trackingQuest:null, sound:true, time:8

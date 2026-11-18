@@ -8,6 +8,7 @@ import {propertyMap} from './property-map.js';
 import {propertyWalk} from './property-walk.js';
 import {propertyEntryPicker} from './property-entry.js';
 import {kitchen} from './town-life.js';
+import {currentFriend} from './evolutions.js';
 
 const categoryByItem=Object.fromEntries(Object.keys(items).map(id=>[id,
   Object.hasOwn(crops,id)||cropFood.includes(id)?'garden':
@@ -104,7 +105,7 @@ export function frontierPanels(state,{action,itemBadge,wantedBadge,propertyPrevi
     return `<div class="folio-feature bounty-cover">
       <span class="chapter-illustration">${icon('compass',36)}</span>
       <div><strong>Find a bandit</strong><p>Read a poster for their last known location. Bring them in to collect Suncoins and Ranger badges.</p></div>${purse()}</div>
-      ${missing?`<div class="wanted-note"><strong>${species[missing.pet].name} is missing</strong><p>Capture ${BANDITS.find(b=>b.id===missing.bandit)?.name??'the bandit'} to rescue your friend.</p></div>`:''}
+      ${missing?`<div class="wanted-note"><strong>${currentFriend(state,missing.pet).name} is missing</strong><p>Capture ${BANDITS.find(b=>b.id===missing.bandit)?.name??'the bandit'} to rescue your friend.</p></div>`:''}
       ${caseFile?`<section class="bounty-dossier" aria-label="Bounty details">
         ${wantedBadge(caseFile.id)}<div><small>${caseStatus} · ${atlas[caseFile.realm]?.name??'Blossom Valley'}</small>
           <h3>${caseFile.name}</h3><p>${caseFile.clue}</p>${bountyPrize(caseFile)}</div>

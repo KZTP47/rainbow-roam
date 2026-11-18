@@ -16,6 +16,7 @@ import {sideConversations} from './dialogue.js';
 import {wardrobe,defaultLook} from './wardrobe.js';
 import {atlas,homeland,houses,spells} from './horizons.js';
 import {loadGame,saveGame,readSaveFile,downloadSave} from './save-files.js';
+import {currentFriend,evolveFriend} from './evolutions.js';
 import {home,currencies,cropFood,extensions,workHomestead,propertyArea,propertyArrival,nearHomestead,wizardTowerPoint} from './homestead.js';
 import {makeHomestead} from './homestead-art.js';
 import {marketAtPlace,transact} from './market.js';
@@ -456,7 +457,7 @@ function useRoomStation(room,station){
   }
 }
 function feedCrop(item){
-  const id=state.active,pet=species[id];
+  const id=state.active,pet=currentFriend(state,id);
   if(!pet||state.bounties.abducted?.pet===id||(!cropFood.includes(item)&&!Object.hasOwn(kitchen,item))||!(state.inventory[item]>0)) return;
   const history=state.care[id]??={affinity:0};
   const now=Date.now();
@@ -471,7 +472,7 @@ function feedCrop(item){
 }
 
 function careAction(kind) {
-  const id=state.active, pet=species[id];
+  const id=state.active, pet=currentFriend(state,id);
   if(!pet||!['pet','feed','play','rest','scout','meet'].includes(kind)) return;
   const history=state.care[id]??={affinity:0};
   if(kind==='rest'){
@@ -565,7 +566,7 @@ function activityContext(){
   const {x,z}=state.player,local=townServiceAt(state.realm,x,z,4.2);
   const place=local?.place??regionAt(x,z,state.realm);
   const homeAccess=state.homestead.owned&&nearHomestead(state);
-  return {place,local,regions,species,items,atlas,
+  return {place,local,regions,species,items,atlas,friendName:id=>currentFriend(state,id)?.name,
     kitchen:place==='village'||homeAccess||['garden','inn','market'].includes(local?.kind),
     post:place==='village'||local?.kind==='post',
     lookout:place==='village'||local?.kind==='lookout',
@@ -706,6 +707,18 @@ function action(type,id) {
       return;
     case 'cast':cast(id);return;
     case 'pet-care':careAction(id);return;
+    case 'evolve-friend': {
+      if(!active||!ownsGameWindow()||ui.opened!=='companions') return;
+      const [friendId,next]=id.split('/');
+      const previous=currentFriend(state,friendId);
+      const form=evolveFriend(state,friendId,Number(next));
+      if(form){
+        ui.toast(previous.name+' evolved',form.name,'sparkles');
+        audio.play('success');
+        refresh();
+      }
+      return;
+    }
     case 'voyage':
       if(atlas[id]) travel(atlas[id].entry,true);
       return;
