@@ -43,7 +43,8 @@ const hollow=[
   '#############'
 ];
 
-export const lowerFloorPlans = [cellar,hollow];
+// Read positions from saves made before the lower floors had mazes.
+export const legacyLowerFloorPlans = [cellar,hollow];
 
 export function runeAnswerMatches(puzzle,answer) {
   return Boolean(puzzle&&Array.isArray(answer)&&answer.length===puzzle.order.length&&

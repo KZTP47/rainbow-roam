@@ -3,7 +3,7 @@ import {skyIslands} from './sky-islands.js';
 import {atlas} from './horizons.js';
 import {dungeonHabitat} from './dungeon-habitats.js';
 import {dungeonSites} from './dungeon-sites.js';
-import {lowerFloorPlans,runeAnswerMatches,runePuzzle} from './dungeon-depths.js';
+import {legacyLowerFloorPlans,runeAnswerMatches,runePuzzle} from './dungeon-depths.js';
 
 const styles=['mossvault','prismfault','bellhollow'];
 const caveNames=['Rootways','Crystal Grotto','Echo Vault'];
@@ -72,6 +72,7 @@ export const dungeonFoes=Object.freeze({
 
 const cardinal=[[-1,0],[1,0],[0,-1],[0,1]];
 const cache=new Map();
+const lowerLayoutVersion=2;
 
 function seeded(seed){
   return ()=>{
@@ -125,7 +126,7 @@ export function dungeonCanStand(layout,x,z,radius=.41){
     open(x-radius,z+radius)&&open(x+radius,z-radius));
 }
 
-function createLayout(entrance,theme){
+function createLayout(entrance,theme,depth=0){
   const random=seeded(theme.seed),size=theme.span*2+1;
   const tiles=Array(size**2).fill(null),layout={...entrance,...theme,width:size,height:size,tiles};
   function carve(x,z,zone){
@@ -205,7 +206,7 @@ function createLayout(entrance,theme){
   const cargo=skyIslands[entrance.place]?.item[0]??region.material??(habitat.family==='tide'?'salt':'wood');
   chests[1].rewards[cargo]=(chests[1].rewards[cargo]??0)+3;
   chests[2].rewards['relic-'+habitat.family]=1;
-  if(entrance.place==='corsairCove'){
+  if(entrance.place==='corsairCove'&&!depth){
     layout.chambers=['The Rope Landing','Stolen Cargo','Beacon Room','The Ballast Lock','Keelhaul Steps','The Drowned Treasury'];
     layout.motto='Follow the tide marks to the drowned treasury. Mermaids swim quickly through the channels.';
     layout.guardian='The Keelbreaker';chests[2].name='Captain’s Pay Chest';
@@ -219,6 +220,9 @@ function createLayout(entrance,theme){
     const locker=tiles.find(cell=>cell?.flooded&&distances[cell.index]===8);
     if(locker)chests.splice(1,0,{id:'tide-locker',name:'Shipwright’s Sunken Locker',cell:locker,rewards:{salt:4,'tideCompass':1}});
   }
+  Object.assign(layout,{habitat,entry,exit,tower,chests,enemies,depth});
+  if(depth) return addLowerWing(layout,carve,distances);
+
   const approach=carve(4,startZ,0);
   layout.height+=6;
   tiles.length=layout.width*layout.height;
@@ -230,43 +234,49 @@ function createLayout(entrance,theme){
   const puzzle={...runePuzzle(theme.seed,0),gate,approach,orientation:1};
   layout.chambers.push('The Lantern Stair');
   chests.splice(-1,0,{id:'seal-cache',name:'Lantern Stair Chest',cell:chest,sealed:true,rewards:{hpPotion:1,treat:2,coins:9}});
-  return {...layout,habitat,entry,exit,tower,chests,enemies,puzzle,descent,depth:0};
+  return {...layout,puzzle,descent};
 }
 
-function createLowerLayout(surface,depth){
-  const plan=lowerFloorPlans[depth-1];
-  const width=plan[0].length,height=plan.length;
-  const layout={...surface,depth,width,height,tiles:[],entry:null,exit:null,tower:null,diveMouth:null,reef:null,
-    name:surface.name,chambers:depth===1?['Lantern Cellar','The Spiral Landing']:['Wishing Hollow','The Rune Treasury'],
-    enemies:[],chests:[],descent:null};
-  let gate,chest;
-  const gateRow=plan.findIndex(row=>row.includes('G'));
-  for(const [z,row] of plan.entries()){
-    for(const [x,mark] of [...row].entries()){
-      const index=z*width+x;
-      if(mark==='#'){layout.tiles.push(null);continue;}
-      const cell={x,z,index,wx:x*dungeonTile,wz:z*dungeonTile,zone:z===gateRow?null:z>gateRow?0:1};
-      layout.tiles.push(cell);
-      if(mark==='U') layout.exit=cell;
-      if(mark==='E') layout.entry=cell;
-      if(mark==='D') layout.descent=cell;
-      if(mark==='G') gate=cell;
-      if(mark==='C') chest=cell;
-    }
+function addLowerWing(layout,carve,distances){
+  const {width,tiles,depth}=layout;
+  const cellar=depth===1,wingRows=6;
+  const approach=tiles.filter(cell=>cell?.z===1&&cell.x>=3&&cell.x<=width-4)
+    .reduce((furthest,cell)=>distances[cell.index]>distances[furthest.index]?cell:furthest);
+  // Make room beyond the far edge without opening a second path around the seal.
+  tiles.unshift(...Array(width*wingRows).fill(null));
+  layout.height+=wingRows;
+  for(const cell of tiles){
+    if(!cell) continue;
+    cell.index+=width*wingRows;
+    cell.z+=wingRows;
+    cell.wz=cell.z*dungeonTile;
   }
-  const approach=dungeonCell(layout,gate.x,gate.z+1);
-  layout.puzzle={...runePuzzle(surface.seed,depth),gate,approach,orientation:-1};
-  layout.chests.push({id:'seal-cache',name:depth===1?'Spiral Landing Chest':'Rune Treasury Chest',cell:chest,sealed:true,
-    rewards:depth===1?{hpPotion:2,crystal:3,coins:16}:{charm:2,crystal:6,coins:25,['relic-'+surface.habitat.family]:1}});
+  const {x}=approach,zone=layout.chambers.length;
+  const gate=carve(x,wingRows,null);
+  const chest=carve(x,wingRows-1,zone);
+  for(let z=1;z<=wingRows-2;z++) for(let dx=-1;dx<=1;dx++) carve(x+dx,z,zone);
+  layout.chambers[0]=cellar?'Lantern Cellar':'Wishing Hollow';
+  layout.chambers.push(cellar?'The Spiral Landing':'The Rune Treasury');
+  layout.guardian=cellar?'The Cellar Warden':'The Treasury Keeper';
+  const lootNames=cellar?['Cellar Supplies','Lantern Keeper’s Cache','Cellar Warden’s Hoard']:
+    ['Hollow Supplies','Wishing Cache','Treasury Keeper’s Hoard'];
+  layout.chests.forEach((entry,index)=>{entry.name=lootNames[index];});
+  layout.chests.push({id:'seal-cache',name:cellar?'Spiral Landing Chest':'Rune Treasury Chest',cell:chest,sealed:true,
+    rewards:cellar?{hpPotion:2,crystal:3,coins:16}:{charm:2,crystal:6,coins:25,['relic-'+layout.habitat.family]:1}});
+  layout.puzzle={...runePuzzle(themes[layout.id].seed,depth),gate,approach,orientation:-1};
+  layout.tower=null;
+  layout.descent=cellar?carve(x,2,zone):null;
   return layout;
 }
 
 export function dungeonLayout(id,depth=0){
-  if(!Object.hasOwn(themes,id)||!Number.isInteger(depth)||depth<0||depth>lowerFloorPlans.length) return null;
-  if(!cache.has(id)) cache.set(id,createLayout(dungeonEntrances.find(entry=>entry.id===id),themes[id]));
-  if(!depth) return cache.get(id);
-  const key=id+'/'+depth;
-  if(!cache.has(key)) cache.set(key,createLowerLayout(cache.get(id),depth));
+  if(!Object.hasOwn(themes,id)||!Number.isInteger(depth)||depth<0||depth>legacyLowerFloorPlans.length) return null;
+  const key=depth?id+'/'+depth:id;
+  if(!cache.has(key)){
+    const theme=themes[id];
+    const seed=depth?(theme.seed^Math.imul(depth,0x9e3779b9))>>>0:theme.seed;
+    cache.set(key,createLayout(dungeonEntrances.find(entry=>entry.id===id),{...theme,seed},depth));
+  }
   return cache.get(key);
 }
 
@@ -279,10 +289,29 @@ export function newDungeons(){
 }
 
 function newExpedition(layout){
-  return {position:atCell(layout.entry),visited:[],opened:[],defeated:[],...(layout.puzzle?{seal:false}:{})};
+  return {position:atCell(layout.entry),visited:[],opened:[],defeated:[],...(layout.puzzle?{seal:false}:{}),
+    ...(layout.depth?{layoutVersion:lowerLayoutVersion}:{})};
+}
+
+function migrateLowerExpedition(layout,expedition){
+  const plan=legacyLowerFloorPlans[layout.depth-1],width=plan[0].length;
+  const {x,z}=expedition.position??{};
+  const oldRow=Math.round(z/dungeonTile),oldMark=plan[oldRow]?.[Math.round(x/dungeonTile)];
+  const gateRow=plan.findIndex(row=>row.includes('G'));
+  const chest=layout.chests.find(entry=>entry.sealed).cell;
+  const inWing=expedition.seal===true&&oldMark&&oldMark!=='#'&&oldRow<=gateRow;
+  const landing=inWing?(oldMark==='D'?layout.descent??chest:chest):oldMark==='U'?layout.exit:layout.entry;
+  const landmarks={E:layout.entry,U:layout.exit,G:layout.puzzle.gate,C:chest,D:layout.descent};
+  const visited=(Array.isArray(expedition.visited)?expedition.visited:[]).flatMap(index=>{
+    if(!Number.isInteger(index)) return [];
+    const cell=landmarks[plan[Math.floor(index/width)]?.[index%width]];
+    return cell?[cell.index]:[];
+  });
+  return {...expedition,position:atCell(landing),visited};
 }
 
 function normalizeExpedition(layout,expedition){
+  if(layout.depth&&expedition.layoutVersion!==lowerLayoutVersion) expedition=migrateLowerExpedition(layout,expedition);
   const filter=(list,allowed)=>Array.isArray(list)?[...new Set(list.filter(id=>allowed.has(id)))]:[];
   const position=expedition.position;
   const seal=layout.puzzle&&expedition.seal===true;
@@ -297,7 +326,8 @@ function normalizeExpedition(layout,expedition){
     visited:filter(expedition.visited,new Set(layout.tiles.filter(cell=>cell&&!beyond(cell)).map(cell=>cell.index))),
     opened:filter(expedition.opened,new Set(layout.chests.filter(chest=>seal||!chest.sealed).map(chest=>chest.id))),
     defeated:filter(expedition.defeated,new Set(layout.enemies.map(enemy=>enemy.id))),
-    ...(layout.puzzle?{seal}: {})
+    ...(layout.puzzle?{seal}:{}),
+    ...(layout.depth?{layoutVersion:lowerLayoutVersion}:{})
   };
 }
 
@@ -311,7 +341,7 @@ export function normalizeDungeons(raw){
     const layout=dungeonLayout(id);
     const surface=clean.expeditions[id]=normalizeExpedition(layout,expedition);
     let previous=surface;
-    for(let depth=1;depth<=lowerFloorPlans.length&&previous.seal;depth++){
+    for(let depth=1;depth<=legacyLowerFloorPlans.length&&previous.seal;depth++){
       const savedFloor=expedition.floors?.[depth];
       if(!savedFloor||typeof savedFloor!=='object') break;
       (surface.floors??={})[depth]=previous=normalizeExpedition(dungeonLayout(id,depth),savedFloor);
