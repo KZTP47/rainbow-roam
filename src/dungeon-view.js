@@ -539,6 +539,17 @@ function advance(layout,body,dx,dz,radius=.41){
   return body.x!==startX||body.z!==startZ;
 }
 
+function clearCameraArm(layout,position,offset){
+  const steps=Math.ceil(offset.length()/.12);
+  for(let step=1;step<=steps;step++){
+    const fraction=step/steps;
+    if(!dungeonCanStand(layout,position.x+offset.x*fraction,position.z+offset.y*fraction,.38)){
+      return (step-1)/steps;
+    }
+  }
+  return 1;
+}
+
 function drawExploredMap(canvas,layout,visited){
   const ctx=canvas.getContext('2d'),pixel=canvas.width/layout.width;
   ctx.fillStyle='#262335';ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -689,10 +700,11 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   const moveKeys=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift']);
   const start=expedition.position;
   const cameraAim=new T.Vector3(),boltStart=new T.Vector3(),boltEnd=new T.Vector3();
+  const cameraOffset=new T.Vector2(),cameraGoal=new T.Vector2(),cameraStep=new T.Vector2();
   const options=new AbortController(),listener={signal:options.signal};
   let elapsed=0,last=performance.now(),frame=0,guardUntil=0,bulletUntil=0,strikeUntil=0,toastUntil=0;
   let cell=null,field=dungeonDistanceField(layout,null),area=layout.chambers[0],activePanel=null;
-  let grabbed=null,lookHeight=0,eyePitch=-.12,eyeHeight=null,camDistance=3.7,actorYaw=start.yaw,flashUntil=0;
+  let grabbed=null,lookHeight=0,eyePitch=-.12,eyeHeight=null,following=false,actorYaw=start.yaw,flashUntil=0;
   let prompt=null,dead=false,closed=false,runeSequence=[];
 
   let chartDirty=true,lastMiniX,lastMiniZ,lastMiniYaw;
@@ -752,6 +764,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   function togglePerspective(){
     if(activePanel||dead)return;
     progress.firstPerson=!progress.firstPerson;
+    following=false;
     applyPerspective();persist();
   }
 
@@ -956,7 +969,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
       enemy.windup=0;enemy.attackTime=elapsed+1.6;
       if(!defeated.has(enemy.id)) enemy.hp=dungeonFoes[enemy.kind].hp;
     }
-    dead=false;guardUntil=0;flashUntil=0;camDistance=3.7;
+    dead=false;guardUntil=0;flashUntil=0;following=false;
     closePanel();reportHealth();persist();
   }
 
@@ -1088,6 +1101,33 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     }
   }
 
+  function followCamera(position,direction,bodyY,dt){
+    cameraGoal.set(-direction.x,-direction.z).multiplyScalar(3.83);
+    cameraGoal.multiplyScalar(clearCameraArm(layout,position,cameraGoal));
+    if(!following){
+      cameraOffset.copy(cameraGoal);
+      following=true;
+    }else{
+      const maxStep=dt*9;
+      cameraStep.copy(cameraGoal).sub(cameraOffset).multiplyScalar(1-Math.exp(-dt*12));
+      cameraStep.clampLength(0,maxStep).add(cameraOffset);
+      if(clearCameraArm(layout,position,cameraStep)===1) cameraOffset.copy(cameraStep);
+      else{
+        // Pull back along the current sightline before swinging past a corner.
+        cameraOffset.multiplyScalar(clearCameraArm(layout,position,cameraOffset));
+        cameraOffset.setLength(Math.max(0,cameraOffset.length()-maxStep));
+      }
+    }
+    const distance=cameraOffset.length();
+    const open=T.MathUtils.smoothstep(distance,.30,1.85);
+    const height=1.60+bodyY*.65+distance*.17+(1-open)*.95;
+    const ahead=T.MathUtils.lerp(.15,3,open);
+    const aimHeight=T.MathUtils.lerp(1.10,1.34,open)+bodyY*.65+lookHeight*T.MathUtils.lerp(.22,1,open);
+    camera.position.set(position.x+cameraOffset.x,height,position.z+cameraOffset.y);
+    cameraAim.set(position.x+direction.x*ahead,aimHeight,position.z+direction.z*ahead);
+    camera.lookAt(cameraAim);
+  }
+
   function view(dt,moving){
     const p=expedition.position;
     const direction={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};
@@ -1106,17 +1146,8 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
       world.blade.rotation.set(-.39-swing*.45,-.24,.19+swing*1.35+(guardUntil>elapsed?.52:0));
       reticle.classList.toggle('warded',guardUntil>elapsed);
     }else{
-      let available=.12;
-      for(let back=.22;back<=3.88;back+=.19){
-        // A camera following alongside a wall needs less clearance than the traveler.
-        if(!dungeonCanStand(layout,p.x-direction.x*back,p.z-direction.z*back,.38)) break;
-        available=back;
-      }
-      camDistance=Math.min(available,T.MathUtils.lerp(camDistance,available,Math.min(1,dt*10)));
-      camera.position.set(p.x-direction.x*camDistance,1.60+bodyY*.65+camDistance*.17,p.z-direction.z*camDistance);
-      cameraAim.set(p.x+direction.x*3.0,1.34+bodyY*.65+lookHeight,p.z+direction.z*3.0);
-      camera.lookAt(cameraAim);
-      player.group.visible=camDistance>1.05;
+      followCamera(p,direction,bodyY,dt);
+      player.group.visible=true;
     }
     const pitch=swimming?(moving?1.00:.55):0;
     player.model.rotation.x=T.MathUtils.damp(player.model.rotation.x,pitch,8,dt);
@@ -1209,7 +1240,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     const dx=event.clientX-grabbed.x,dy=event.clientY-grabbed.y;
     expedition.position.yaw=(expedition.position.yaw-dx*.0064)%(Math.PI*2);
     if(progress.firstPerson)eyePitch=T.MathUtils.clamp(eyePitch-dy*.005,-1.12,1.12);
-    else lookHeight=T.MathUtils.clamp(lookHeight+dy*.014,-1.40,1.44);
+    else lookHeight=T.MathUtils.clamp(lookHeight-dy*.014,-1.40,1.44);
     Object.assign(grabbed,{x:event.clientX,y:event.clientY,d:grabbed.d+Math.abs(dx)+Math.abs(dy)});
   },listener);
   canvas.addEventListener('pointerup',event=>{
