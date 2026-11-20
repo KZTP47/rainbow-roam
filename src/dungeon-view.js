@@ -686,7 +686,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   const health=get('[data-underground-hp]'),life=get('.underground-health progress');
   const targetBadge=get('.underground-target'),toast=get('.underground-toast'),zoneLabel=get('[data-underground-zone]');
   const keys=new Set(),cooldowns=new Map(),visited=new Set(expedition.visited),defeated=new Set(expedition.defeated);
-  const moveKeys={arrowup:'w',arrowdown:'s',arrowleft:'left',arrowright:'right',w:'w',a:'a',s:'s',d:'d'};
+  const moveKeys=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift']);
   const start=expedition.position;
   const cameraAim=new T.Vector3(),boltStart=new T.Vector3(),boltEnd=new T.Vector3();
   const options=new AbortController(),listener={signal:options.signal};
@@ -776,7 +776,8 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   }
 
   function showHelp(){
-    openPanel('help','Dungeon controls','<dl><div><dt>WASD</dt><dd>Walk. Drag or use ← and → to look around.</dd></div>'+
+    openPanel('help','Dungeon controls','<dl><div><dt>WASD or arrows</dt><dd>Move in the direction you see on screen.</dd></div>'+
+      '<div><dt>Look</dt><dd>Drag the view or hold Shift and press ← or → to turn.</dd></div>'+
       '<div><dt>V</dt><dd>Switch first-person view on or off. Drag to aim. Click or press 1 to swing your blade.</dd></div>'+
       '<div><dt>E</dt><dd>Open a chest, inspect a rune seal, or use a stairway, portal or exit.</dd></div>'+
       (layout.diveMouth||diving?'<div><dt>E</dt><dd>Mermaids dive and surface at rising bubbles. Bring petals and sunberries for reef friends.</dd></div>':'')+
@@ -1002,8 +1003,8 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     // The surface game stays paused behind the dungeon and should not receive its controls.
     event.stopImmediatePropagation();
     if(activePanel&&key==='escape'){event.preventDefault();closePanel();return;}
-    if(moveKeys[key]){
-      event.preventDefault();if(!activePanel) keys.add(moveKeys[key]);return;
+    if(moveKeys.has(key)){
+      event.preventDefault();if(!activePanel) keys.add(key);return;
     }
     if(event.repeat) return;
     const bar=hotbar.find(slot=>slot.key===key);
@@ -1016,14 +1017,17 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
 
   function keyup(event){
     const key=event.key.toLowerCase();
-    if(moveKeys[key]&&keys.delete(moveKeys[key])){event.stopImmediatePropagation();persist();}
+    if(moveKeys.has(key)&&keys.delete(key)){event.stopImmediatePropagation();persist();}
   }
 
   function walk(dt){
     const p=expedition.position;
-    const rotation=Number(keys.has('right'))-Number(keys.has('left'));
-    p.yaw=(p.yaw-dt*rotation*1.85)%(Math.PI*2);
-    const forward=Number(keys.has('w'))-Number(keys.has('s')),side=Number(keys.has('d'))-Number(keys.has('a'));
+    const right=keys.has('arrowright'),left=keys.has('arrowleft');
+    const turning=keys.has('shift');
+    if(turning) p.yaw=(p.yaw-dt*(Number(right)-Number(left))*1.85)%(Math.PI*2);
+    const held=(key,arrow)=>Number(keys.has(key)||keys.has('touch:'+key)||arrow);
+    const forward=held('w',keys.has('arrowup'))-held('s',keys.has('arrowdown'));
+    const side=held('d',!turning&&right)-held('a',!turning&&left);
     const d=Math.hypot(forward,side);
     if(!d) return false;
     const lx=(Math.sin(p.yaw)*forward-Math.cos(p.yaw)*side)/d;
@@ -1104,7 +1108,8 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     }else{
       let available=.12;
       for(let back=.22;back<=3.88;back+=.19){
-        if(!dungeonCanStand(layout,p.x-direction.x*back,p.z-direction.z*back,.64)) break;
+        // A camera following alongside a wall needs less clearance than the traveler.
+        if(!dungeonCanStand(layout,p.x-direction.x*back,p.z-direction.z*back,.38)) break;
         available=back;
       }
       camDistance=Math.min(available,T.MathUtils.lerp(camDistance,available,Math.min(1,dt*10)));
@@ -1214,7 +1219,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   },listener);
   canvas.addEventListener('pointercancel',()=>{grabbed=null;},listener);
   for(const button of shell.querySelectorAll('[data-underground-move]')){
-    const key=button.dataset.undergroundMove;
+    const key='touch:'+button.dataset.undergroundMove;
     button.addEventListener('pointerdown',event=>{
       if(activePanel||dead) return;
       event.preventDefault();button.setPointerCapture(event.pointerId);keys.add(key);
