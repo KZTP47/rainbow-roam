@@ -8,7 +8,7 @@ import {traveler} from './traveler.js';
 import {disposeHuman} from './human.js';
 import {icon} from './icons.js';
 import {
-  buildDungeonTower,changeDiveDepth,changeDungeonFloor,drinkDungeonPotion,dungeonCanStand,dungeonCell,dungeonCellAt,dungeonDistanceField,
+  buildDungeonTower,changeDiveDepth,changeDungeonFloor,drinkDungeonPotion,dungeonCameraDistance,dungeonCanStand,dungeonCell,dungeonCellAt,dungeonDistanceField,
   dungeonEntrances,dungeonFoes,dungeonLayer,dungeonMaxHealth,dungeonPassableCell,dungeonStep,dungeonTile,dungeonTowerCost,openDungeonSeal
 } from './dungeons.js';
 import {runeSymbols} from './dungeon-depths.js';
@@ -532,22 +532,12 @@ function visibleBetween(layout,a,b){
   return true;
 }
 
-function advance(layout,body,dx,dz,radius=.41){
+function advance(layout,body,dx,dz,radius=.41,clear){
   const startX=body.x,startZ=body.z;
-  if(dungeonCanStand(layout,body.x+dx,body.z,radius)) body.x+=dx;
-  if(dungeonCanStand(layout,body.x,body.z+dz,radius)) body.z+=dz;
+  const canStep=(x,z)=>dungeonCanStand(layout,x,z,radius)&&(!clear||clear(x,z));
+  if(dx&&canStep(body.x+dx,body.z)) body.x+=dx;
+  if(dz&&canStep(body.x,body.z+dz)) body.z+=dz;
   return body.x!==startX||body.z!==startZ;
-}
-
-function clearCameraArm(layout,position,offset){
-  const steps=Math.ceil(offset.length()/.12);
-  for(let step=1;step<=steps;step++){
-    const fraction=step/steps;
-    if(!dungeonCanStand(layout,position.x+offset.x*fraction,position.z+offset.y*fraction,.38)){
-      return (step-1)/steps;
-    }
-  }
-  return 1;
 }
 
 function drawExploredMap(canvas,layout,visited){
@@ -697,14 +687,14 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   const health=get('[data-underground-hp]'),life=get('.underground-health progress');
   const targetBadge=get('.underground-target'),toast=get('.underground-toast'),zoneLabel=get('[data-underground-zone]');
   const keys=new Set(),cooldowns=new Map(),visited=new Set(expedition.visited),defeated=new Set(expedition.defeated);
-  const moveKeys=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift']);
+  const moveKeys=new Set(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']);
   const start=expedition.position;
-  const cameraAim=new T.Vector3(),boltStart=new T.Vector3(),boltEnd=new T.Vector3();
-  const cameraOffset=new T.Vector2(),cameraGoal=new T.Vector2(),cameraStep=new T.Vector2();
+  const boltStart=new T.Vector3(),boltEnd=new T.Vector3();
   const options=new AbortController(),listener={signal:options.signal};
   let elapsed=0,last=performance.now(),frame=0,guardUntil=0,bulletUntil=0,strikeUntil=0,toastUntil=0;
   let cell=null,field=dungeonDistanceField(layout,null),area=layout.chambers[0],activePanel=null;
-  let grabbed=null,lookHeight=0,eyePitch=-.12,eyeHeight=null,following=false,actorYaw=start.yaw,flashUntil=0;
+  let grabbed=null,orbitPitch=0,eyePitch=-.12,eyeHeight=null,actorYaw=start.yaw,strikeYaw=start.yaw,flashUntil=0;
+  player.group.rotation.y=actorYaw;
   let prompt=null,dead=false,closed=false,runeSequence=[];
 
   let chartDirty=true,lastMiniX,lastMiniZ,lastMiniYaw;
@@ -764,7 +754,6 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   function togglePerspective(){
     if(activePanel||dead)return;
     progress.firstPerson=!progress.firstPerson;
-    following=false;
     applyPerspective();persist();
   }
 
@@ -925,9 +914,9 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
       guardUntil=elapsed+1.34;
       notify('Ward raised');
     }else{
-      actorYaw=p.yaw;
       const target=combatTarget(id==='blade'?2.02:8.6);
       if(id==='blade'){
+        strikeYaw=target&&distance(target,p)>.02?Math.atan2(target.x-p.x,target.z-p.z):p.yaw;
         strikeUntil=elapsed+.27;
         if(target) dealDamage(target,29);
       }else{
@@ -964,12 +953,14 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     progress.health=dungeonMaxHealth;
     Object.assign(expedition.position,{x:layout.entry.wx,z:layout.entry.wz,yaw:Math.PI});
     actorYaw=expedition.position.yaw;
+    player.group.rotation.y=actorYaw;
+    grabbed=null;
     for(const enemy of enemies){
       enemy.x=enemy.cell.wx;enemy.z=enemy.cell.wz;
       enemy.windup=0;enemy.attackTime=elapsed+1.6;
       if(!defeated.has(enemy.id)) enemy.hp=dungeonFoes[enemy.kind].hp;
     }
-    dead=false;guardUntil=0;flashUntil=0;following=false;
+    dead=false;guardUntil=0;flashUntil=0;strikeUntil=0;bulletUntil=0;eyeHeight=null;
     closePanel();reportHealth();persist();
   }
 
@@ -1017,7 +1008,12 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     event.stopImmediatePropagation();
     if(activePanel&&key==='escape'){event.preventDefault();closePanel();return;}
     if(moveKeys.has(key)){
-      event.preventDefault();if(!activePanel) keys.add(key);return;
+      event.preventDefault();
+      if(!activePanel&&!dead&&!event.repeat){
+        const turning=event.shiftKey&&(key==='arrowleft'||key==='arrowright');
+        keys.add(turning?'turn:'+key:key);
+      }
+      return;
     }
     if(event.repeat) return;
     const bar=hotbar.find(slot=>slot.key===key);
@@ -1030,25 +1026,35 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
 
   function keyup(event){
     const key=event.key.toLowerCase();
-    if(moveKeys.has(key)&&keys.delete(key)){event.stopImmediatePropagation();persist();}
+    if(moveKeys.has(key)&&(keys.delete(key)||keys.delete('turn:'+key))){event.stopImmediatePropagation();persist();}
   }
 
   function walk(dt){
     const p=expedition.position;
-    const right=keys.has('arrowright'),left=keys.has('arrowleft');
-    const turning=keys.has('shift');
-    if(turning) p.yaw=(p.yaw-dt*(Number(right)-Number(left))*1.85)%(Math.PI*2);
+    const turn=Number(keys.has('turn:arrowright'))-Number(keys.has('turn:arrowleft'));
+    if(turn) p.yaw=(p.yaw-dt*turn*1.85)%(Math.PI*2);
     const held=(key,arrow)=>Number(keys.has(key)||keys.has('touch:'+key)||arrow);
     const forward=held('w',keys.has('arrowup'))-held('s',keys.has('arrowdown'));
-    const side=held('d',!turning&&right)-held('a',!turning&&left);
+    const side=held('d',keys.has('arrowright'))-held('a',keys.has('arrowleft'));
     const d=Math.hypot(forward,side);
     if(!d) return false;
     const lx=(Math.sin(p.yaw)*forward-Math.cos(p.yaw)*side)/d;
     const lz=(Math.cos(p.yaw)*forward+Math.sin(p.yaw)*side)/d;
     const flooded=dungeonCellAt(layout,p.x,p.z)?.flooded;
     const speed=diving?5.4:flooded?(state.look?.morph===5?6.3:3.05):4.85;
-    const moving=advance(layout,p,lx*dt*speed,lz*dt*speed);
-    if(moving) actorYaw=Math.atan2(lx,lz);
+    const threat=findEnemy(layout,enemies,p,defeated,3);
+    const gap=threat?distance(threat,p):3;
+    const retreat=threat&&(threat.x-p.x)*lx+(threat.z-p.z)*lz<-.3*gap;
+    const pace=retreat?1:T.MathUtils.lerp(.62,1,T.MathUtils.smoothstep(gap,.85,3));
+    const fromX=p.x,fromZ=p.z;
+    const moving=advance(layout,p,lx*dt*speed*pace,lz*dt*speed*pace,.41,(x,z)=>enemies.every(enemy=>{
+      if(defeated.has(enemy.id)) return true;
+      const radius=enemy.kind==='guardian'?.98:.78;
+      const nextGap=Math.hypot(x-enemy.x,z-enemy.z);
+      // Allow a player saved inside a monster to move out of the overlap.
+      return nextGap>=radius||nextGap>=distance(p,enemy);
+    }));
+    if(moving) actorYaw=Math.atan2(p.x-fromX,p.z-fromZ);
     return moving;
   }
 
@@ -1101,36 +1107,8 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     }
   }
 
-  function followCamera(position,direction,bodyY,dt){
-    cameraGoal.set(-direction.x,-direction.z).multiplyScalar(3.83);
-    cameraGoal.multiplyScalar(clearCameraArm(layout,position,cameraGoal));
-    if(!following){
-      cameraOffset.copy(cameraGoal);
-      following=true;
-    }else{
-      const maxStep=dt*9;
-      cameraStep.copy(cameraGoal).sub(cameraOffset).multiplyScalar(1-Math.exp(-dt*12));
-      cameraStep.clampLength(0,maxStep).add(cameraOffset);
-      if(clearCameraArm(layout,position,cameraStep)===1) cameraOffset.copy(cameraStep);
-      else{
-        // Pull back along the current sightline before swinging past a corner.
-        cameraOffset.multiplyScalar(clearCameraArm(layout,position,cameraOffset));
-        cameraOffset.setLength(Math.max(0,cameraOffset.length()-maxStep));
-      }
-    }
-    const distance=cameraOffset.length();
-    const open=T.MathUtils.smoothstep(distance,.30,1.85);
-    const height=1.60+bodyY*.65+distance*.17+(1-open)*.95;
-    const ahead=T.MathUtils.lerp(.15,3,open);
-    const aimHeight=T.MathUtils.lerp(1.10,1.34,open)+bodyY*.65+lookHeight*T.MathUtils.lerp(.22,1,open);
-    camera.position.set(position.x+cameraOffset.x,height,position.z+cameraOffset.y);
-    cameraAim.set(position.x+direction.x*ahead,aimHeight,position.z+direction.z*ahead);
-    camera.lookAt(cameraAim);
-  }
-
   function view(dt,moving){
     const p=expedition.position;
-    const direction={x:Math.sin(p.yaw),z:Math.cos(p.yaw)};
     const swimming=diving||cell?.flooded&&state.look?.morph===5;
     const ground=channelBed(layout,cell,p.x,p.z);
     const bodyY=diving?.72+Math.sin(elapsed*2.6)*.10:swimming?Math.max(ground,-.50)+Math.sin(elapsed*3)*.045:ground;
@@ -1146,13 +1124,18 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
       world.blade.rotation.set(-.39-swing*.45,-.24,.19+swing*1.35+(guardUntil>elapsed?.52:0));
       reticle.classList.toggle('warded',guardUntil>elapsed);
     }else{
-      followCamera(p,direction,bodyY,dt);
+      const backX=-Math.sin(p.yaw),backZ=-Math.cos(p.yaw);
+      const arm=dungeonCameraDistance(layout,p.x,p.z,backX,backZ);
+      const tight=1-T.MathUtils.smoothstep(arm,.30,1.35);
+      camera.position.set(p.x+backX*arm,1.60+bodyY*.65+arm*.17+tight*.60,p.z+backZ*arm);
+      camera.rotation.set(orbitPitch-.13-tight*.46,p.yaw+Math.PI,0,'YXZ');
       player.group.visible=true;
     }
     const pitch=swimming?(moving?1.00:.55):0;
     player.model.rotation.x=T.MathUtils.damp(player.model.rotation.x,pitch,8,dt);
     player.group.position.set(p.x,bodyY,p.z);
-    player.group.rotation.y=actorYaw;
+    const facing=(elapsed<strikeUntil?strikeYaw:actorYaw)-player.group.rotation.y;
+    player.group.rotation.y+=Math.atan2(Math.sin(facing),Math.cos(facing))*(1-Math.exp(-dt*20));
     if(world.tide)world.tide.uniforms.time.value=elapsed;
     animate(player,elapsed,moving);
     world.lantern.position.set(p.x,2.34,p.z);
@@ -1167,7 +1150,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     world.strike.visible=elapsed<strikeUntil;
     if(world.strike.visible){
       world.strike.position.set(p.x,1.0,p.z);
-      world.strike.rotation.set(-Math.PI/2,0,Math.PI/2-actorYaw-(strikeUntil-elapsed)*6);
+      world.strike.rotation.set(-Math.PI/2,0,Math.PI/2-strikeYaw-(strikeUntil-elapsed)*6);
     }
     for(const [i,art] of chestArts.entries()){
       art.group.visible=!expedition.opened.includes(layout.chests[i].id);
@@ -1231,24 +1214,28 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   const canvas=renderer.domElement;
   canvas.addEventListener('contextmenu',event=>event.preventDefault(),listener);
   canvas.addEventListener('pointerdown',event=>{
-    if(activePanel||dead) return;
-    grabbed={id:event.pointerId,x:event.clientX,y:event.clientY,d:0};
+    if(activePanel||dead||grabbed||(event.button!==0&&event.button!==2)) return;
+    grabbed={id:event.pointerId,x:event.clientX,y:event.clientY,button:event.button,dragging:event.button===2};
     canvas.setPointerCapture(event.pointerId);
   },listener);
   canvas.addEventListener('pointermove',event=>{
     if(!grabbed||grabbed.id!==event.pointerId) return;
     const dx=event.clientX-grabbed.x,dy=event.clientY-grabbed.y;
+    if(!grabbed.dragging&&Math.hypot(dx,dy)<4) return;
+    grabbed.dragging=true;
     expedition.position.yaw=(expedition.position.yaw-dx*.0064)%(Math.PI*2);
     if(progress.firstPerson)eyePitch=T.MathUtils.clamp(eyePitch-dy*.005,-1.12,1.12);
-    else lookHeight=T.MathUtils.clamp(lookHeight-dy*.014,-1.40,1.44);
-    Object.assign(grabbed,{x:event.clientX,y:event.clientY,d:grabbed.d+Math.abs(dx)+Math.abs(dy)});
+    else orbitPitch=T.MathUtils.clamp(orbitPitch-dy*.0022,-.42,.33);
+    Object.assign(grabbed,{x:event.clientX,y:event.clientY});
   },listener);
   canvas.addEventListener('pointerup',event=>{
     if(!grabbed||grabbed.id!==event.pointerId) return;
-    if(grabbed.d<4&&event.pointerType==='mouse') useSlot('blade');
+    if(!grabbed.dragging&&grabbed.button===0&&event.pointerType==='mouse') useSlot('blade');
     grabbed=null;persist();
   },listener);
-  canvas.addEventListener('pointercancel',()=>{grabbed=null;},listener);
+  for(const type of ['pointercancel','lostpointercapture']) canvas.addEventListener(type,event=>{
+    if(grabbed?.id===event.pointerId) grabbed=null;
+  },listener);
   for(const button of shell.querySelectorAll('[data-underground-move]')){
     const key='touch:'+button.dataset.undergroundMove;
     button.addEventListener('pointerdown',event=>{

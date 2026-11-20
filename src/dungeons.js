@@ -126,6 +126,42 @@ export function dungeonCanStand(layout,x,z,radius=.41){
     open(x-radius,z+radius)&&open(x+radius,z-radius));
 }
 
+const cameraArm=3.83,cameraSkin=.04,cameraTurnLimit=7;
+
+function wallFaceLimit(near,low,high,normal,tangent,limit){
+  const intercept=near*tangent/normal;
+  if(normal>0&&intercept>=low&&intercept<=high) limit=Math.min(limit,near/normal);
+  // Find the minimum of distance + angular difference × cameraTurnLimit on this face.
+  // Along a face the minimum is at an endpoint, the current ray, or where the slopes match.
+  const slopeMatch=Math.sqrt(near*(Math.hypot(near,2*cameraTurnLimit)-near)/2);
+  for(const point of [low,high,-slopeMatch,slopeMatch]){
+    if(point<low||point>high) continue;
+    const range=Math.hypot(near,point);
+    if(range>=limit) continue;
+    const angle=Math.abs(Math.atan2(point*normal-near*tangent,near*normal+point*tangent));
+    limit=Math.min(limit,range+angle*cameraTurnLimit);
+  }
+  return limit;
+}
+
+export function dungeonCameraDistance(layout,x,z,backX,backZ){
+  // Use the same square clearance as dungeonCanStand and a buffer before the actual wall.
+  const half=dungeonTile/2+.38,reach=cameraArm+cameraSkin+half;
+  let limit=cameraArm+cameraSkin;
+  for(let tz=Math.ceil((z-reach)/dungeonTile);tz<=Math.floor((z+reach)/dungeonTile);tz++){
+    for(let tx=Math.ceil((x-reach)/dungeonTile);tx<=Math.floor((x+reach)/dungeonTile);tx++){
+      if(dungeonPassableCell(layout,tx,tz)) continue;
+      const left=tx*dungeonTile-x-half,right=left+2*half;
+      const front=tz*dungeonTile-z-half,back=front+2*half;
+      if(left>0) limit=wallFaceLimit(left,front,back,backX,backZ,limit);
+      else if(right<0) limit=wallFaceLimit(-right,front,back,-backX,backZ,limit);
+      if(front>0) limit=wallFaceLimit(front,left,right,backZ,backX,limit);
+      else if(back<0) limit=wallFaceLimit(-back,left,right,-backZ,backX,limit);
+    }
+  }
+  return Math.max(0,limit-cameraSkin);
+}
+
 function createLayout(entrance,theme,depth=0){
   const random=seeded(theme.seed),size=theme.span*2+1;
   const tiles=Array(size**2).fill(null),layout={...entrance,...theme,width:size,height:size,tiles};
