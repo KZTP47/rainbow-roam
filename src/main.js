@@ -47,7 +47,10 @@ const propertyView=()=>propertyArea(state.player,state.realm,state.homestead);
 let world,createWorld,active=false,building=false,starting=false,importing=false,propertyEntry=propertyView();
 let dungeonCleanup=null,dungeonLoading=false,physicalHome=false,autoPropertyView=null;
 let saveMode,petBattle=null;
-const ui=createUI(app,state,{start,action,mapHeight:(realm,x,z)=>world?.mapHeight(realm,x,z),drawOutfit:(canvas,framing)=>world?.drawOutfit(canvas,framing),walkRenderer:()=>world?.renderer,propertyPreview:view=>world?.propertyPreview(view),trackingJourney:()=>world?.trackingJourney(),activityContext,importFile},Boolean(loaded));
+const ui=createUI(app,state,{start,action,mapHeight:(realm,x,z)=>world?.mapHeight(realm,x,z),
+  drawOutfit:(canvas,framing)=>world?.drawOutfit(canvas,framing),sproutPicture:spec=>world?.sproutPicture(spec),
+  walkRenderer:()=>world?.renderer,propertyPreview:view=>world?.propertyPreview(view),
+  trackingJourney:()=>world?.trackingJourney(),activityContext,importFile},Boolean(loaded));
 
 const trailGames=createTrailGames(state,{menu,persist,play:kind=>audio.play(kind),inside:()=>world?.insideRoom()});
 

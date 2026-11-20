@@ -1,4 +1,4 @@
-// Cell order of the reviewed portrait sheets. New entries without a cell use their icon.
+// Cell order of the reviewed portrait sheets. Other species use the base form on the evolution sheet.
 export const portraitIds={
   item:[
     'spore','silk','bell','shell','honey','ribbon','jade','glow',

@@ -420,20 +420,45 @@ export function createWorld(container,state,callback) {
   }
 
   let portraitTarget;
-  function drawOutfit(canvas,framing) {
-    if(contextLost || !canvas) return;
+  function drawPortrait(canvas,studio,lens){
     const {width,height}=canvas;
     portraitTarget??=new T.WebGLRenderTarget(width,height,{colorSpace:T.SRGBColorSpace,samples:4});
+    portraitTarget.setSize(width,height);
+    const lastTarget=renderer.getRenderTarget();
+    const pixels=new Uint8Array(width*height*4);
+    renderer.setRenderTarget(portraitTarget);
+    try{
+      renderer.render(studio,lens);
+      renderer.readRenderTargetPixels(portraitTarget,0,0,width,height,pixels);
+    }finally{
+      renderer.setRenderTarget(lastTarget);
+    }
+    const context=canvas.getContext('2d');
+    const image=context.createImageData(width,height);
+    for(let y=0;y<height;y++){
+      const start=(height-1-y)*width*4;
+      image.data.set(pixels.subarray(start,start+width*4),y*width*4);
+    }
+    context.putImageData(image,0,0);
+  }
+
+  function portraitStudio(background){
     const studio=new T.Scene();
-    studio.background=new T.Color('#e9e0ec');
+    studio.background=background;
     studio.add(new T.HemisphereLight('#fff2e6','#a6a6ca',1.8));
     const key=new T.DirectionalLight('#fff0d2',2.65);
     key.position.set(-2,3,2);
     studio.add(key);
+    return studio;
+  }
+
+  function drawOutfit(canvas,framing) {
+    if(contextLost || !canvas) return;
+    const studio=portraitStudio(new T.Color('#e9e0ec'));
     const avatar=traveler(state.look);
     avatar.group.rotation.y=-.22;
     studio.add(avatar.group);
-    const lens=new T.PerspectiveCamera(32,width/height,.1,30);
+    const lens=new T.PerspectiveCamera(32,canvas.width/canvas.height,.1,30);
     if(framing==='face'){
       const center=state.look.morph===3?1.50:1.91;
       lens.position.set(.12,center+.04,state.look.morph===3?2.15:1.74);
@@ -442,20 +467,28 @@ export function createWorld(container,state,callback) {
       lens.position.set(.08,1.34,4.77);
       lens.lookAt(0,1.21,0);
     }
-    const lastTarget=renderer.getRenderTarget();
-    renderer.setRenderTarget(portraitTarget);
-    renderer.render(studio,lens);
-    const pixels=new Uint8Array(width*height*4);
-    renderer.readRenderTargetPixels(portraitTarget,0,0,width,height,pixels);
-    renderer.setRenderTarget(lastTarget);
-    disposeHuman(avatar.group);
-    const context=canvas.getContext('2d');
-    const image=context.createImageData(width,height);
-    for(let y=0;y<height;y++){
-      const start=(height-1-y)*width*4;
-      image.data.set(pixels.subarray(start,start+width*4),y*width*4);
+    try{
+      drawPortrait(canvas,studio,lens);
+    }finally{
+      disposeHuman(avatar.group);
     }
-    context.putImageData(image,0,0);
+  }
+
+  function sproutPicture(spec){
+    if(contextLost) return;
+    const canvas=document.createElement('canvas');
+    canvas.width=canvas.height=128;
+    const studio=portraitStudio(new T.Color('#f4e8d8').lerp(new T.Color(spec.color),.18));
+    const {group}=creature(spec);
+    studio.add(group);
+    const bounds=new T.Box3().setFromObject(group);
+    const center=bounds.getCenter(new T.Vector3()),size=bounds.getSize(new T.Vector3());
+    const span=Math.max(size.x,size.y,size.z)*.72+.065;
+    const lens=new T.OrthographicCamera(-span,span,span,-span,.1,30);
+    lens.position.copy(center).add(new T.Vector3(4.15,2.35,7.4));
+    lens.lookAt(center);
+    drawPortrait(canvas,studio,lens);
+    return canvas.toDataURL('image/webp',.92);
   }
 
   function resize() {
@@ -1385,7 +1418,7 @@ export function createWorld(container,state,callback) {
     setKey(key,on){if(on) keys.add(key);else keys.delete(key);},
     clearKeys(){keys.clear();},
     jump(){if(active&&!paused&&grounded){grounded=false;speedY=7.0;}},
-    resetCamera,interaction,placeBlock,removeBlock,updateOutfit,drawOutfit,
+    resetCamera,interaction,placeBlock,removeBlock,updateOutfit,drawOutfit,sproutPicture,
     syncLighting(){updateLighting();needsRender=true;},
     canWalk:safeGround,
     setBuild(value,type) {if(value!==building) mouseAim=false;building=value;selected=type;},

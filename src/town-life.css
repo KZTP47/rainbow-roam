@@ -33,9 +33,9 @@
 .passport-stops .next-stop{background:#f2e1bf;border-radius:6px;color:#77543a}
 .passport-stops .stamped{color:#4a7251}
 .activity-callout{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;margin-bottom:8px;padding:10px;border:1px solid #e2d8b9;border-radius:10px;background:#f5ecd5;color:#50664e}
-.activity-callout .field-art{width:44px;height:44px;border-radius:8px}
+.activity-callout .art-tile{width:44px;height:44px;border-radius:8px}
 .field-notes-grid article,.postcard-grid article{display:grid;justify-items:start;gap:4px;padding:8px;border:1px solid #e7d9bb;border-radius:10px;background:#fffbee;color:#4a6452}
-.field-notes-grid .field-art{width:53px;height:53px;border-radius:8px}
+.field-notes-grid .art-tile{width:53px;height:53px;border-radius:8px}
 .field-notes-grid article small{font-size:.73rem;color:#746650}
 .postcard-grid img{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;border-radius:7px}
 @media(max-width:640px){

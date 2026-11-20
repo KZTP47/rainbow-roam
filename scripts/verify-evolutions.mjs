@@ -118,6 +118,27 @@ async function playtest() {
     const page=await open(false,seed);
     await page.clock.install();
     await page.keyboard.press('c');
+    await button(page,'All creatures').click();
+    const cards=page.locator('.companion-card');
+    assert.equal(await cards.count(),baseIds.length);
+    const missingPictures=await cards.evaluateAll(async entries=>{
+      const sheets=new Map();
+      const missing=[];
+      for(const entry of entries){
+        const tile=entry.querySelector('.friend-plate .art-tile');
+        const source=tile&&getComputedStyle(tile).backgroundImage.match(/^url\("([^"]+)"\)$/)?.[1];
+        if(source&&!sheets.has(source)){
+          const image=new Image();
+          image.src=source;
+          sheets.set(source,image.decode().then(()=>true,()=>false));
+        }
+        if(!source||!await sheets.get(source)) missing.push(entry.querySelector('.friend-description strong').textContent);
+      }
+      return missing;
+    });
+    assert.deepEqual(missingPictures,[],'Every base creature needs a loadable portrait');
+    await button(page,'New friends').click();
+    await screenshot(page,'desktop-new-friends');
     await chart(page).click();
     assert.equal(await page.locator('[data-evolution-row]').count(),baseIds.length);
     assert.equal(await current(page),'Pearlyspark');

@@ -73,7 +73,8 @@ function portrait(id,set,extra=''){
   if(friendIndex>=0) return `<span class="art-tile field-art ${extra}" aria-hidden="true" style="background-image:var(--new-friends);--art-c:${newFriendIds.length*100}%;--art-r:100%;--art-x:${friendIndex/(newFriendIds.length-1)*100}%;--art-y:0%"></span>`;
   const index=pictureSets[set].indexOf(id), columns=8;
   if(index<0){
-    const symbol=set==='item'?items[id]?.[1]??'bag':species[id]?.reefIcon??'paw';
+    if(set==='field'&&evolutionIds.includes(id)) return evolutionPortrait(id,0,extra);
+    const symbol=set==='item'?items[id]?.[1]??'bag':'paw';
     return `<span class="art-tile art-icon ${extra}" aria-hidden="true">${icon(symbol,24)}</span>`;
   }
   const rows=Math.ceil(pictureSets[set].length/columns);
@@ -107,10 +108,16 @@ export function createUI(root, state, actions, hasSave) {
   root.style.setProperty('--item-pictures','url("'+itemPictures+'")');
   root.style.setProperty('--wanted-pictures','url("'+wantedPictures+'")');
   root.style.setProperty('--evolution-pictures','url("'+evolutionPictures+'")');
-  const friendPortrait=(id,extra)=>{
+  const sproutPictures=new Map();
+  const friendPortrait=(id,extra='')=>{
+    const parents=state.petClub.offspring[id];
+    if(parents){
+      const picture=sproutPictures.get(id)??actions.sproutPicture(currentFriend(state,id));
+      if(!picture) return portrait(parents[0],'field',extra);
+      sproutPictures.set(id,picture);
+      return `<img class="art-tile pet-sprout ${extra}" src="${picture}" alt="" draggable="false">`;
+    }
     const stage=friendStage(state,id);
-    const child=state.petClub.offspring[id]&&currentFriend(state,id);
-    if(child) return `<span class="art-tile pet-sprout ${extra??''}" aria-hidden="true" style="--coat:${child.color};--markings:${child.accent}">${icon('paw',26)}</span>`;
     return stage?evolutionPortrait(id,stage,extra):portrait(id,'field',extra);
   };
   root.innerHTML=`
