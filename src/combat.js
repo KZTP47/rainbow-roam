@@ -129,7 +129,7 @@ export function banditModel(data){
   return actor;
 }
 
-export function createCombat({scene,container,state,species,realm,terrainHeight,walkable,report}){
+export function createCombat({scene,container,state,realm,terrainHeight,walkable,report}){
   state.bounties=normalizeBounties(state.bounties);
   state.wallet??={coins:0,badges:0};
   const progress=state.bounties;
@@ -333,8 +333,9 @@ export function createCombat({scene,container,state,species,realm,terrainHeight,
       part(camp,'cube','#d6b68d',1.74,.31,.81,.44,.062,.45,0,-.19);
       scene.add(camp);
     }
-    if(mode==='rescue'&&species[progress.abducted?.pet]){
-      rescueModel=creature(currentFriend(state,progress.abducted.pet));scene.add(rescueModel.group);
+    const rescuedFriend=mode==='rescue'?currentFriend(state,progress.abducted?.pet):null;
+    if(rescuedFriend){
+      rescueModel=creature(rescuedFriend);scene.add(rescueModel.group);
       rescueModel.group.scale.setScalar(.78);
       const x=where.x-1.85,z=where.z+.47;
       rescueModel.group.position.set(x,terrainHeight(x,z),z);

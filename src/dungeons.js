@@ -3,6 +3,7 @@ import {skyIslands} from './sky-islands.js';
 import {atlas} from './horizons.js';
 import {dungeonHabitat} from './dungeon-habitats.js';
 import {dungeonSites} from './dungeon-sites.js';
+import {lowerFloorPlans,runeAnswerMatches,runePuzzle} from './dungeon-depths.js';
 
 const styles=['mossvault','prismfault','bellhollow'];
 const caveNames=['Rootways','Crystal Grotto','Echo Vault'];
@@ -87,6 +88,11 @@ export function dungeonCellAt(layout,x,z){
   return dungeonCell(layout,Math.round(x/dungeonTile),Math.round(z/dungeonTile));
 }
 
+export function dungeonPassableCell(layout,x,z){
+  const cell=dungeonCell(layout,x,z);
+  return cell&&cell.index!==layout.blockedGate?cell:null;
+}
+
 export function dungeonDistanceField(layout,start){
   const field=new Int16Array(layout.tiles.length).fill(-1);
   if(!start) return field;
@@ -95,7 +101,7 @@ export function dungeonDistanceField(layout,start){
   for(let i=0;i<queue.length;i++){
     const cell=queue[i],distance=field[cell.index]+1;
     for(const [dx,dz] of cardinal){
-      const next=dungeonCell(layout,cell.x+dx,cell.z+dz);
+      const next=dungeonPassableCell(layout,cell.x+dx,cell.z+dz);
       if(!next||field[next.index]>=0) continue;
       field[next.index]=distance;
       queue.push(next);
@@ -107,16 +113,16 @@ export function dungeonDistanceField(layout,start){
 export function dungeonStep(layout,cell,field){
   if(!cell||field[cell.index]<=0) return null;
   for(const [dx,dz] of cardinal){
-    const next=dungeonCell(layout,cell.x+dx,cell.z+dz);
+    const next=dungeonPassableCell(layout,cell.x+dx,cell.z+dz);
     if(next&&field[next.index]===field[cell.index]-1) return next;
   }
   return null;
 }
 
 export function dungeonCanStand(layout,x,z,radius=.41){
-  return Boolean(dungeonCellAt(layout,x,z)&&
-    dungeonCellAt(layout,x-radius,z-radius)&&dungeonCellAt(layout,x+radius,z+radius)&&
-    dungeonCellAt(layout,x-radius,z+radius)&&dungeonCellAt(layout,x+radius,z-radius));
+  const open=(px,pz)=>dungeonPassableCell(layout,Math.round(px/dungeonTile),Math.round(pz/dungeonTile));
+  return Boolean(open(x,z)&&open(x-radius,z-radius)&&open(x+radius,z+radius)&&
+    open(x-radius,z+radius)&&open(x+radius,z-radius));
 }
 
 function createLayout(entrance,theme){
@@ -213,13 +219,55 @@ function createLayout(entrance,theme){
     const locker=tiles.find(cell=>cell?.flooded&&distances[cell.index]===8);
     if(locker)chests.splice(1,0,{id:'tide-locker',name:'Shipwright’s Sunken Locker',cell:locker,rewards:{salt:4,'tideCompass':1}});
   }
-  return {...layout,habitat,entry,exit,tower,chests,enemies};
+  const approach=carve(4,startZ,0);
+  layout.height+=6;
+  tiles.length=layout.width*layout.height;
+  tiles.fill(null,size**2);
+  const gate=carve(4,size-1,null);
+  const chest=carve(4,size,6);
+  for(let z=size+1;z<=size+4;z++) for(let x=3;x<=5;x++) carve(x,z,6);
+  const descent=carve(4,size+3,6);
+  const puzzle={...runePuzzle(theme.seed,0),gate,approach,orientation:1};
+  layout.chambers.push('The Lantern Stair');
+  chests.splice(-1,0,{id:'seal-cache',name:'Lantern Stair Chest',cell:chest,sealed:true,rewards:{hpPotion:1,treat:2,coins:9}});
+  return {...layout,habitat,entry,exit,tower,chests,enemies,puzzle,descent,depth:0};
 }
 
-export function dungeonLayout(id){
-  if(!Object.hasOwn(themes,id)) return null;
+function createLowerLayout(surface,depth){
+  const plan=lowerFloorPlans[depth-1];
+  const width=plan[0].length,height=plan.length;
+  const layout={...surface,depth,width,height,tiles:[],entry:null,exit:null,tower:null,diveMouth:null,reef:null,
+    name:surface.name,chambers:depth===1?['Lantern Cellar','The Spiral Landing']:['Wishing Hollow','The Rune Treasury'],
+    enemies:[],chests:[],descent:null};
+  let gate,chest;
+  const gateRow=plan.findIndex(row=>row.includes('G'));
+  for(const [z,row] of plan.entries()){
+    for(const [x,mark] of [...row].entries()){
+      const index=z*width+x;
+      if(mark==='#'){layout.tiles.push(null);continue;}
+      const cell={x,z,index,wx:x*dungeonTile,wz:z*dungeonTile,zone:z===gateRow?null:z>gateRow?0:1};
+      layout.tiles.push(cell);
+      if(mark==='U') layout.exit=cell;
+      if(mark==='E') layout.entry=cell;
+      if(mark==='D') layout.descent=cell;
+      if(mark==='G') gate=cell;
+      if(mark==='C') chest=cell;
+    }
+  }
+  const approach=dungeonCell(layout,gate.x,gate.z+1);
+  layout.puzzle={...runePuzzle(surface.seed,depth),gate,approach,orientation:-1};
+  layout.chests.push({id:'seal-cache',name:depth===1?'Spiral Landing Chest':'Rune Treasury Chest',cell:chest,sealed:true,
+    rewards:depth===1?{hpPotion:2,crystal:3,coins:16}:{charm:2,crystal:6,coins:25,['relic-'+surface.habitat.family]:1}});
+  return layout;
+}
+
+export function dungeonLayout(id,depth=0){
+  if(!Object.hasOwn(themes,id)||!Number.isInteger(depth)||depth<0||depth>lowerFloorPlans.length) return null;
   if(!cache.has(id)) cache.set(id,createLayout(dungeonEntrances.find(entry=>entry.id===id),themes[id]));
-  return cache.get(id);
+  if(!depth) return cache.get(id);
+  const key=id+'/'+depth;
+  if(!cache.has(key)) cache.set(key,createLowerLayout(cache.get(id),depth));
+  return cache.get(key);
 }
 
 function atCell(cell){
@@ -231,18 +279,25 @@ export function newDungeons(){
 }
 
 function newExpedition(layout){
-  return {position:atCell(layout.entry),visited:[],opened:[],defeated:[]};
+  return {position:atCell(layout.entry),visited:[],opened:[],defeated:[],...(layout.puzzle?{seal:false}:{})};
 }
 
 function normalizeExpedition(layout,expedition){
   const filter=(list,allowed)=>Array.isArray(list)?[...new Set(list.filter(id=>allowed.has(id)))]:[];
   const position=expedition.position;
-  const safe=Number.isFinite(position?.x)&&Number.isFinite(position?.z)&&dungeonCanStand(layout,position.x,position.z);
+  const seal=layout.puzzle&&expedition.seal===true;
+  const blocked=layout.puzzle&&!seal;
+  // Legacy floor-one tile indices stay unchanged when the new wing is appended.
+  const beyond=cell=>blocked&&(cell.z-layout.puzzle.gate.z)*layout.puzzle.orientation>=0;
+  const standing=dungeonCellAt(layout,position?.x,position?.z);
+  const walkable=blocked?{...layout,blockedGate:layout.puzzle.gate.index}:layout;
+  const safe=Number.isFinite(position?.x)&&Number.isFinite(position?.z)&&dungeonCanStand(walkable,position.x,position.z)&&!beyond(standing);
   return {
     position:safe?{x:position.x,z:position.z,yaw:Number.isFinite(position.yaw)?position.yaw%(Math.PI*2):Math.PI}:atCell(layout.entry),
-    visited:filter(expedition.visited,new Set(layout.tiles.filter(Boolean).map(cell=>cell.index))),
-    opened:filter(expedition.opened,new Set(layout.chests.map(chest=>chest.id))),
-    defeated:filter(expedition.defeated,new Set(layout.enemies.map(enemy=>enemy.id)))
+    visited:filter(expedition.visited,new Set(layout.tiles.filter(cell=>cell&&!beyond(cell)).map(cell=>cell.index))),
+    opened:filter(expedition.opened,new Set(layout.chests.filter(chest=>seal||!chest.sealed).map(chest=>chest.id))),
+    defeated:filter(expedition.defeated,new Set(layout.enemies.map(enemy=>enemy.id))),
+    ...(layout.puzzle?{seal}: {})
   };
 }
 
@@ -255,9 +310,18 @@ export function normalizeDungeons(raw){
     if(!expedition||typeof expedition!=='object') continue;
     const layout=dungeonLayout(id);
     const surface=clean.expeditions[id]=normalizeExpedition(layout,expedition);
+    let previous=surface;
+    for(let depth=1;depth<=lowerFloorPlans.length&&previous.seal;depth++){
+      const savedFloor=expedition.floors?.[depth];
+      if(!savedFloor||typeof savedFloor!=='object') break;
+      (surface.floors??={})[depth]=previous=normalizeExpedition(dungeonLayout(id,depth),savedFloor);
+    }
+    if(raw.active===id&&Number.isInteger(expedition.depth)&&Object.hasOwn(surface.floors??{},expedition.depth)){
+      surface.depth=expedition.depth;
+    }
     if(layout.reef&&expedition.reef&&typeof expedition.reef==='object'){
       surface.reef=normalizeExpedition(layout.reef,expedition.reef);
-      surface.diving=raw.active===id&&expedition.diving===true;
+      surface.diving=raw.active===id&&!surface.depth&&expedition.diving===true;
     }
     if(raw?.towers?.[id]===true) clean.towers[id]=true;
   }
@@ -272,6 +336,7 @@ export function enterDungeon(state,id,{atTower=false}={}){
   if(atTower&&!progress.towers[id]) return false;
   const expedition=progress.expeditions[id]??=newExpedition(layout);
   if(expedition.reef)expedition.diving=false;
+  delete expedition.depth;
   expedition.position=atCell(atTower?layout.tower:layout.entry);
   if(atTower) expedition.position.z+=1.12;
   progress.active=id;
@@ -281,7 +346,7 @@ export function enterDungeon(state,id,{atTower=false}={}){
 export function changeDiveDepth(state){
   const progress=state.dungeons,layout=dungeonLayout(progress.active);
   const surface=progress.expeditions[progress.active];
-  if(!layout?.reef||!surface)return false;
+  if(!layout?.reef||!surface||surface.depth)return false;
   const leaving=surface.diving===true;
   if(!leaving&&state.look?.morph!==5)return false;
   const position=leaving?surface.reef.position:surface.position;
@@ -295,8 +360,50 @@ export function changeDiveDepth(state){
   return true;
 }
 
+export function dungeonLayer(state){
+  const progress=state.dungeons,id=progress.active,trip=progress.expeditions[id];
+  if(!trip) return {};
+  const depth=trip.depth??0;
+  if(trip.diving&&state.look?.morph===5) return {layout:dungeonLayout(id).reef,expedition:trip.reef,diving:true};
+  return {layout:dungeonLayout(id,depth),expedition:depth?trip.floors?.[depth]:trip,diving:false};
+}
+
+function nearCell(position,cell){
+  return cell&&Math.hypot(position.x-cell.wx,position.z-cell.wz)<1.46;
+}
+
+export function openDungeonSeal(state,answer){
+  const {layout,expedition}=dungeonLayer(state);
+  if(!layout?.puzzle||!expedition||expedition.seal||!nearCell(expedition.position,layout.puzzle.approach)||
+     !runeAnswerMatches(layout.puzzle,answer)) return false;
+  expedition.seal=true;
+  return true;
+}
+
+export function changeDungeonFloor(state,direction){
+  const {layout,expedition,diving}=dungeonLayer(state);
+  if(!layout||!expedition||diving||![1,-1].includes(direction))return false;
+  const {active:id,expeditions}=state.dungeons,trip=expeditions[id];
+  const depth=layout.depth+direction;
+  const next=dungeonLayout(id,depth);
+  if(!next)return false;
+  if(direction===1){
+    if(!expedition.seal||!nearCell(expedition.position,layout.descent))return false;
+    const floor=(trip.floors??={})[depth]??=newExpedition(next);
+    floor.position=atCell(next.entry);
+    trip.depth=depth;
+  } else {
+    if(!nearCell(expedition.position,layout.exit))return false;
+    const floor=depth?trip.floors[depth]:trip;
+    floor.position={...atCell(next.descent),yaw:layout.depth===1?Math.PI:0};
+    if(depth)trip.depth=depth;
+    else delete trip.depth;
+  }
+  return true;
+}
+
 export function buildDungeonTower(state,id){
-  if(!dungeonLayout(id)||state.dungeons.active!==id||state.dungeons.towers[id]||
+  if(!dungeonLayout(id)||state.dungeons.active!==id||state.dungeons.expeditions[id]?.depth||state.dungeons.towers[id]||
     (state.inventory.crystal??0)<dungeonTowerCost.crystal||state.wallet.coins<dungeonTowerCost.coins) return false;
   state.wallet.coins-=dungeonTowerCost.coins;
   state.inventory.crystal-=dungeonTowerCost.crystal;

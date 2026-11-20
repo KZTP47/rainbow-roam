@@ -11,6 +11,7 @@ import {dialFaces,starDials} from './spirehaven-rooms.js';
 import {trails} from './town-trails.js';
 import {normalizeRoomActivities} from './regional-interiors.js';
 import {normalizeDungeons} from './dungeons.js';
+import {normalizePetClub} from './pet-club.js';
 
 const format='rainbow-roam-save';
 const checkpointKey='rainbowRoamCheckpoint';
@@ -35,7 +36,10 @@ export function normalizeSave(saved){
   if(!isRecord(saved)||saved.version!==1||!Number.isFinite(saved.player?.x)||
     !Number.isFinite(saved.player?.z)||!isRecord(saved.inventory)) throw new Error('This file is not a Rainbow Roam save.');
   const fresh=newGame();
-  const companions=list(saved.companions,species);
+  const bonded=list(saved.companions,species);
+  const petClub=normalizePetClub(saved.petClub,species,bonded);
+  const offspring=Object.keys(petClub.offspring);
+  const companions=[...bonded,...offspring];
   const bounties=normalizeBounties(saved.bounties);
   if(bounties.abducted&&!companions.includes(bounties.abducted.pet)) bounties.abducted=null;
   const realm=known(atlas,saved.realm)?saved.realm:homeland;
@@ -64,7 +68,7 @@ export function normalizeSave(saved){
   const townLife=normalizeTownLife(saved.townLife,regions,species,companions);
   const active=companions.includes(saved.active)&&saved.active!==bounties.abducted?.pet&&saved.active!==townLife.trip?.pet?saved.active:null;
   return {
-    ...fresh,realm,companions,active,blocks,discoveries,bounties,townLife,loot:normalizeLoot(saved.loot),
+    ...fresh,realm,companions,petClub,active,blocks,discoveries,bounties,townLife,loot:normalizeLoot(saved.loot),
     player:{x:number(saved.player.x,0,-480,480),z:number(saved.player.z,10,-480,480),yaw:number(saved.player.yaw,0,-1e6,1e6),
       ...(realm==='silvercoast'&&!mode&&saved.player.belowDeck===true&&inHold(saved.player.x,saved.player.z)?{belowDeck:true}:{})},
     transit:['fly','swim'].includes(mode)&&Number.isFinite(saved.transit.y)
@@ -74,7 +78,7 @@ export function normalizeSave(saved){
     evolutions:filtered(saved.evolutions,companions.filter(id=>evolutionIds.includes(id)),
       stage=>stage===1||stage===2?stage:undefined),
     stamp:filtered(saved.stamp,regionIds,v=>v===true||v===1?true:undefined),
-    care:filtered(saved.care,speciesIds,record=>isRecord(record)?{
+    care:filtered(saved.care,[...speciesIds,...offspring],record=>isRecord(record)?{
       affinity:Math.min(12,counter(record.affinity)),resting:record.resting===true,
       ...filtered(record,['petAt','feedAt','playAt'],v=>number(v,0,0,Date.now()))
     }:undefined),

@@ -6,6 +6,7 @@ import {defaultLook} from './wardrobe.js';
 import {farmItems,farmRecipes,newHomestead} from './homestead.js';
 import {dungeonRelics} from './dungeon-habitats.js';
 import {newDungeons} from './dungeons.js';
+import {newPetClub} from './pet-club.js';
 
 export const SAVE_KEY = 'rainbow-roam-celshade-v1';
 export const restTimes={sunrise:6.35,sunset:18.05,night:22.15};
@@ -121,7 +122,7 @@ export const resourceSpots = [
 export function newGame() {
   return {
     version:1, realm:homeland, transit:null, stamp:{}, care:{}, magic:{house:null,known:[],mastered:{}}, look:{...defaultLook}, player:{...START}, inventory:{ treat:1, wood:4, berry:2 }, bonds:{},
-    companions:[], evolutions:{}, active:null, quests:{poppy:'active'}, crafted:{}, placed:{}, blocks:[],
+    companions:[], evolutions:{}, petClub:newPetClub(), active:null, quests:{poppy:'active'}, crafted:{}, placed:{}, blocks:[],
     wallet:{coins:30,badges:0},homestead:newHomestead(),loot:[],townLife:newTownLife(),bounties:{target:null,captured:{},abducted:null,raidClock:0},
     spirehaven:{dials:{},aligned:false},roomActivities:{},trails:{},dungeons:newDungeons(),health:5,
     discoveries:['village'], harvested:{}, selected:'plank', trackingItem:null, trackingQuest:null, sound:true, time:8

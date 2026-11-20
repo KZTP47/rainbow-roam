@@ -220,7 +220,7 @@ export function createWorld(container,state,callback) {
     }
     y=playerFloor(p.x,p.z);
   }
-  const combat=createCombat({scene,container,state,species,realm,terrainHeight,
+  const combat=createCombat({scene,container,state,realm,terrainHeight,
     walkable:(x,z)=>safeGround(x,z)&&!homestead?.blocks?.(x,z)&&(realm==='sky'||waterSurface(x,z)===null),
     report:callback.combatReport});
   combat.setActive(false);
@@ -478,6 +478,7 @@ export function createWorld(container,state,callback) {
     buddyId=state.active;buddyStage=stage;
     if(!buddyId) return;
     const data=currentFriend(state,buddyId),look=creature(data);
+    if(state.petClub?.offspring[buddyId]) look.group.scale.multiplyScalar(.76);
     const shadow=addShadow(scene,shadowTexture,(data.kind==='unicorn'?.69:.51)*look.group.scale.x);
     scene.add(look.group);
     indoorLayers(look.group);indoorLayers(shadow);
@@ -672,7 +673,7 @@ export function createWorld(container,state,callback) {
     if(!active||paused||building||insideRoom()||homestead?.inside?.(state.player.x,state.player.z)) return;
     if(coastal&&state.player.belowDeck&&!state.transit) return;
     if(state.transit?.mode==='fly'){landing=!landing;return;}
-    const owned=state.companions.includes(state.active)&&canFly(species[state.active]);
+    const owned=state.companions.includes(state.active)&&canFly(currentFriend(state,state.active));
     state.transit={mode:'fly',y:y+1.2,mount:owned?state.active:null};
     landing=false;
     y=state.transit.y;grounded=false;

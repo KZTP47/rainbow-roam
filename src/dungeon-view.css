@@ -287,3 +287,24 @@
   .underground-toast { top: calc(var(--rail) + 147px); }
   .underground-target { left: var(--rail); transform: none; }
 }
+
+.underground-runes {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 6px;
+}
+.underground-runes button {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 8px 4px;
+  min-height: 48px;
+  border: 1px solid #caaed371;
+  border-radius: 9px;
+  color: #f8deb1;
+  background: #41354e;
+  font-size: .81rem;
+}
+.underground-runes button:hover { background: #594365; }
+.underground-sheet .rune-feedback { min-height: 2.9em; }
+.underground-legend .rune-legend { color: #f0aade; }

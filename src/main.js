@@ -17,6 +17,7 @@ import {wardrobe,defaultLook} from './wardrobe.js';
 import {atlas,homeland,houses,spells} from './horizons.js';
 import {loadGame,saveGame,readSaveFile,downloadSave} from './save-files.js';
 import {currentFriend,evolveFriend} from './evolutions.js';
+import {breedPet,playPetTurn,startPetBattle} from './pet-club.js';
 import {home,currencies,cropFood,extensions,workHomestead,propertyArea,propertyArrival,nearHomestead,wizardTowerPoint} from './homestead.js';
 import {makeHomestead} from './homestead-art.js';
 import {marketAtPlace,transact} from './market.js';
@@ -45,7 +46,7 @@ const travelPoints={village:[0,10],grove:[-24,-10],lake:[14,-6],ridge:[29,-41],f
 const propertyView=()=>propertyArea(state.player,state.realm,state.homestead);
 let world,createWorld,active=false,building=false,starting=false,importing=false,propertyEntry=propertyView();
 let dungeonCleanup=null,dungeonLoading=false,physicalHome=false,autoPropertyView=null;
-let saveMode;
+let saveMode,petBattle=null;
 const ui=createUI(app,state,{start,action,mapHeight:(realm,x,z)=>world?.mapHeight(realm,x,z),drawOutfit:(canvas,framing)=>world?.drawOutfit(canvas,framing),walkRenderer:()=>world?.renderer,propertyPreview:view=>world?.propertyPreview(view),trackingJourney:()=>world?.trackingJourney(),activityContext,importFile},Boolean(loaded));
 
 const trailGames=createTrailGames(state,{menu,persist,play:kind=>audio.play(kind),inside:()=>world?.insideRoom()});
@@ -233,6 +234,7 @@ function travel(id,allowUndiscovered=false,arrival=null) {
 
 function menu(id, detail) {
   if(id!=='homestead') autoPropertyView=null;
+  if(id!=='petArena') petBattle=null;
   ui.showPanel(id,detail);
   world?.setPaused(Boolean(id));
 }
@@ -593,6 +595,34 @@ function clearTracking(){
 
 function action(type,id) {
   switch(type) {
+    case 'petArena':case 'petNursery':
+      if(active&&ui.opened==='companions') menu(type);
+      return;
+    case 'pet-match': {
+      if(!active||ui.opened!=='petArena'||!ownsGameWindow()) return;
+      if(petBattle&&!petBattle.result) return;
+      const [pet,rival]=id.split('/');
+      petBattle=startPetBattle(state,pet,rival);
+      if(petBattle) menu('petArena',petBattle);
+      return;
+    }
+    case 'pet-turn':
+      if(active&&ui.opened==='petArena'&&ownsGameWindow()&&playPetTurn(state,petBattle,id)){
+        ui.refresh();
+        if(petBattle.result==='won'){audio.play('success');persist();}
+      }
+      return;
+    case 'pet-rematch':
+      if(ui.opened==='petArena'&&petBattle?.result){petBattle=null;menu('petArena');}
+      return;
+    case 'pet-pair': {
+      if(!active||ui.opened!=='petNursery'||!ownsGameWindow()) return;
+      const [first,second]=id.split('/');
+      const birth=breedPet(state,species,first,second);
+      menu('petNursery',birth);
+      if(birth.id){audio.play('success');persist();}
+      return;
+    }
     case 'quick-slot':
       if(!building&&!ui.opened&&!dungeonCleanup) world?.combat(id);
       return;

@@ -8,9 +8,10 @@ import {traveler} from './traveler.js';
 import {disposeHuman} from './human.js';
 import {icon} from './icons.js';
 import {
-  buildDungeonTower,changeDiveDepth,drinkDungeonPotion,dungeonCanStand,dungeonCell,dungeonCellAt,dungeonDistanceField,
-  dungeonEntrances,dungeonFoes,dungeonLayout,dungeonMaxHealth,dungeonStep,dungeonTile,dungeonTowerCost
+  buildDungeonTower,changeDiveDepth,changeDungeonFloor,drinkDungeonPotion,dungeonCanStand,dungeonCell,dungeonCellAt,dungeonDistanceField,
+  dungeonEntrances,dungeonFoes,dungeonLayer,dungeonMaxHealth,dungeonPassableCell,dungeonStep,dungeonTile,dungeonTowerCost,openDungeonSeal
 } from './dungeons.js';
+import {runeSymbols} from './dungeon-depths.js';
 import {channelBed,floodedChannels,tileVariation as cellNoise} from './dungeon-water.js';
 import './dungeon-view.css';
 
@@ -26,6 +27,10 @@ const tint=(value)=>new T.Color(value);
 const glow=(color)=>new T.MeshBasicMaterial({color});
 const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 
+function zoneName(layout,area){
+  return Number.isInteger(layout.depth)?'Floor '+(layout.depth+1)+' · '+area:area;
+}
+
 function markup(layout){
   const buttons=hotbar.map(({id,key,name,symbol})=>
     '<button type="button" data-underground="'+id+'" aria-label="'+name+'">'+icon(symbol,21)+
@@ -37,7 +42,7 @@ function markup(layout){
   return '<section class="underground" aria-label="'+layout.name+'" tabindex="-1">'+
     '<div class="underground-stage"></div><div class="underground-edge" aria-hidden="true"></div>'+
     '<header class="underground-head"><div class="underground-title">'+icon('mountain',27)+
-    '<div><h1>'+layout.name+'</h1><p data-underground-zone>'+layout.chambers[0]+'</p></div></div>'+
+    '<div><h1>'+layout.name+'</h1><p data-underground-zone>'+zoneName(layout,layout.chambers[0])+'</p></div></div>'+
     '<div class="underground-tools"><button type="button" data-underground="view" aria-label="First-person view" title="First-person view (V)">'+icon('eye',20)+'<span>First person</span><kbd>V</kbd></button>'+
     '<button type="button" data-underground="help" aria-label="Dungeon controls">'+icon('compass',20)+'</button></div></header>'+
     '<button class="underground-minimap" data-underground="map" type="button" aria-label="Open dungeon map" title="Open dungeon map (M)">'+
@@ -214,6 +219,64 @@ function sceneGroup(scene,cell){
   const group=new T.Group();
   group.position.set(cell.wx,0,cell.wz);scene.add(group);
   return group;
+}
+
+function sealArt(scene,layout){
+  const {gate,approach,orientation}=layout.puzzle;
+  const frame=sceneGroup(scene,gate),door=new T.Group();
+  frame.add(door);
+  frame.position.z-=orientation*.28;
+  for(const side of [-1,1]){
+    part(frame,'cube',layout.stone[1],side*1.01,1.50,0,.26,3,.54);
+    part(frame,'diamond',glow(layout.accent),side*1.01,2.36,-orientation*.28,.12,.24,.10);
+  }
+  part(frame,'cube',layout.stone[3],0,2.85,0,2.25,.32,.58);
+  part(door,'cube',layout.stone[0],0,1.42,0,2.05,2.60,.32);
+  part(door,'cube','#665365',0,1.55,-orientation*.17,1.57,1.98,.04);
+  const shine=glow(layout.secondary);
+  for(let i=-1;i<=1;i++){
+    const x=i*.39;
+    part(door,'diamond',shine,x,1.60,-orientation*.23,.11,.16,.055,0,.2);
+  }
+  const plate=sceneGroup(scene,approach);
+  pointCirclet(plate,.64,layout.accent);
+  return door;
+}
+
+function passageArt(scene,cell,kind,ascending,layout){
+  const group=sceneGroup(scene,cell);
+  pointCirclet(group,.94,layout.accent);
+  if(kind==='stairs'){
+    group.rotation.y=ascending?Math.PI:0;
+    for(let i=0;i<5;i++){
+      const rise=(i+1)*.125;
+      part(group,'cube',layout.stone[2],0,rise/2,(i-2)*.32,1.47,rise,.34);
+      part(group,'cube',glow(layout.secondary),0,rise+.018,(i-2)*.32-.15,1.20,.028,.022);
+    }
+    for(const side of [-1,1]){
+      part(group,'cube',layout.stone[3],side*.84,.45,0,.15,.9,1.69);
+      part(group,'diamond',glow(layout.accent),side*.84,.99,.63,.11,.18,.11);
+    }
+    return null;
+  }
+  const center=new T.Group();center.position.y=1.16;group.add(center);
+  const material=new T.MeshBasicMaterial({color:layout.accent,transparent:true,opacity:.35,side:T.DoubleSide,depthWrite:false});
+  const veil=new T.Mesh(new T.CircleGeometry(.77,36),material);
+  veil.userData.undergroundOwned=true;center.add(veil);
+  for(const [radius,width,color] of [[.88,.095,layout.stone[2]],[.80,.032,layout.secondary]]){
+    const ring=new T.Mesh(new T.TorusGeometry(radius,width,8,48),glow(color));
+    ring.userData.undergroundOwned=true;center.add(ring);
+  }
+  const sparks=Array.from({length:10},()=>part(center,'diamond',glow(layout.secondary),0,0,.05,.045,.068,.045));
+  return elapsed=>{
+    material.opacity=.22+Math.sin(elapsed*3)*.08;
+    for(const [i,spark] of sparks.entries()){
+      const angle=elapsed*1.9+i*1.34,radius=.18+i*.055;
+      spark.position.x=Math.cos(angle)*radius;
+      spark.position.y=Math.sin(angle)*radius;
+      spark.rotation.z=angle;
+    }
+  };
 }
 
 function exitArch(scene,layout){
@@ -396,9 +459,13 @@ function createWorld(stage,layout,state){
   scene.add(sky,moon,lantern);
   terrain(scene,layout);
   const tide=layout.underwater?reefLight(scene,layout):floodedChannels(scene,layout);
-  const exitMarker=layout.underwater?null:exitArch(scene,layout);
+  const exitMarker=layout.underwater||layout.depth?null:exitArch(scene,layout);
+  const seal=layout.puzzle?sealArt(scene,layout):null;
+  const portals=[];
+  if(layout.descent) portals.push(passageArt(scene,layout.descent,layout.depth===0?'stairs':'portal',false,layout));
+  if(layout.depth) portals.push(passageArt(scene,layout.exit,layout.depth===1?'stairs':'portal',true,layout));
   if(layout.underwater)reefWreck(scene,layout);
-  else entranceLandmark(scene,layout);
+  else if(!layout.depth) entranceLandmark(scene,layout);
   const bubbles=layout.underwater||layout.diveMouth?bubbleColumn(scene,layout.diveMouth??layout.exit):null;
   const friends=(layout.friends??[]).map(({id,cell})=>{
     const actor=creature(species[id]);
@@ -441,7 +508,7 @@ function createWorld(stage,layout,state){
     camera.aspect=clientWidth/clientHeight;camera.updateProjectionMatrix();
   });
   observed.observe(stage);
-  return {scene,renderer,camera,player,blade,tide,friends,bubbles,lantern,railPoint,bolt,strike,wardRing,chestArts,tower,enemies,exitMarker,cleanup(){
+  return {scene,renderer,camera,player,blade,tide,friends,bubbles,lantern,railPoint,bolt,strike,wardRing,chestArts,tower,enemies,exitMarker,seal,portals,cleanup(){
     observed.disconnect();
     disposeHuman(player.group);
     const geos=new Set(),materials=new Set();
@@ -459,7 +526,8 @@ function visibleBetween(layout,a,b){
   const steps=Math.ceil(d/.37);
   for(let i=1;i<steps;i++){
     const t=i/steps;
-    if(!dungeonCellAt(layout,T.MathUtils.lerp(a.x,b.x,t),T.MathUtils.lerp(a.z,b.z,t))) return false;
+    const x=T.MathUtils.lerp(a.x,b.x,t),z=T.MathUtils.lerp(a.z,b.z,t);
+    if(!dungeonPassableCell(layout,Math.round(x/dungeonTile),Math.round(z/dungeonTile))) return false;
   }
   return true;
 }
@@ -499,6 +567,8 @@ function drawExploredMap(canvas,layout,visited){
   }
   marker(layout.exit,'#9ceac0');
   marker(layout.diveMouth,'#8df5f4');
+  marker(layout.puzzle?.approach,'#f0aade');
+  marker(layout.descent,'#9ceac0');
   for(const friend of layout.friends??[])marker(friend.cell,'#f3aeca');
   marker(layout.tower,'#d5c5ff');
   for(const chest of layout.chests) marker(chest.cell,'#ffe0ac');
@@ -523,11 +593,14 @@ function dungeonPrompt(layout,position,progress,expedition,state){
   }
   if(layout.diveMouth&&near(layout.diveMouth)&&state.look?.morph===5)
     return {kind:'dive',label:'Dive through the bubbles'};
-  if(near(layout.entry)||near(layout.exit)) return {kind:'exit',label:'Return to the cave mouth'};
+  if(layout.puzzle&&!expedition.seal&&near(layout.puzzle.approach)) return {kind:'seal',label:'Inspect '+layout.puzzle.title};
+  if(layout.descent&&expedition.seal&&near(layout.descent)) return {kind:'descend',label:layout.depth?'Enter the swirling portal':'Take the stairs down'};
+  if(layout.depth&&near(layout.exit)) return {kind:'ascend',label:layout.depth===1?'Take the stairs up':'Return through the portal'};
+  if(!layout.depth&&(near(layout.entry)||near(layout.exit))) return {kind:'exit',label:'Return to the cave mouth'};
   if(layout.tower&&near(layout.tower)){
     return progress.towers[layout.id]?{kind:'travel',label:'Use Wizard Tower'}:{kind:'build',label:'Raise a Wizard Tower'};
   }
-  const chest=layout.chests.find(entry=>near(entry.cell)&&!expedition.opened.includes(entry.id));
+  const chest=layout.chests.find(entry=>near(entry.cell)&&(!entry.sealed||expedition.seal)&&!expedition.opened.includes(entry.id));
   if(!chest) return null;
   return {kind:'chest',chest,label:'Open '+chest.name};
 }
@@ -589,11 +662,11 @@ export function mountDungeon(host,state,callbacks={}){
 }
 
 function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{},onBefriend},remount){
-  const progress=state.dungeons,surface=dungeonLayout(progress.active),trip=progress.expeditions[progress.active];
-  const diving=trip?.diving&&surface?.reef&&state.look?.morph===5;
-  const layout=diving?surface.reef:surface,expedition=diving?trip.reef:trip;
+  const progress=state.dungeons,trip=progress.expeditions[progress.active];
+  const {layout:floor,expedition,diving}=dungeonLayer(state);
   if(trip?.diving&&!diving)trip.diving=false;
-  if(!layout||!expedition) throw new Error('No active expedition');
+  if(!floor||!expedition) throw new Error('No active expedition');
+  const layout={...floor,blockedGate:expedition.seal?null:floor.puzzle?.gate.index};
   host.innerHTML=markup(layout);
   const shell=host.firstElementChild;
   const get=selector=>shell.querySelector(selector);
@@ -607,6 +680,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   chart.width=layout.width*mapScale;chart.height=layout.height*mapScale;
   const stage=get('.underground-stage');
   const world=createWorld(stage,layout,state);
+  if(world.seal&&expedition.seal) world.seal.visible=false;
   const {camera,renderer,scene,player,enemies,chestArts,tower}=world;
   const overlay=get('.underground-overlay'),control=get('.underground-interact');
   const health=get('[data-underground-hp]'),life=get('.underground-health progress');
@@ -619,7 +693,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   let elapsed=0,last=performance.now(),frame=0,guardUntil=0,bulletUntil=0,strikeUntil=0,toastUntil=0;
   let cell=null,field=dungeonDistanceField(layout,null),area=layout.chambers[0],activePanel=null;
   let grabbed=null,lookHeight=0,eyePitch=-.12,eyeHeight=null,camDistance=3.7,actorYaw=start.yaw,flashUntil=0;
-  let prompt=null,dead=false,closed=false;
+  let prompt=null,dead=false,closed=false,runeSequence=[];
 
   let chartDirty=true,lastMiniX,lastMiniZ,lastMiniYaw;
   const rooms=new Map();
@@ -695,14 +769,16 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
   function showMap(){
     if(activePanel==='map'){closePanel();return;}
     openPanel('map','Explored passages','<canvas width="512" height="512" data-underground-chart aria-label="Map of your explored passages"></canvas>'+
-      '<p class="underground-legend"><span>● '+(diving?'Bubble chimney':'Cave mouth')+'</span>'+(diving?'<span>● Sea friend</span>':'<span>● Tower site</span>')+'<span>● Chest</span></p>');
+      '<p class="underground-legend"><span>● '+(diving?'Bubble chimney':layout.depth?'Stair or portal':'Cave mouth or stairs')+'</span>'+
+      (diving?'<span>● Sea friend</span>':layout.tower?'<span>● Tower site</span>':'')+
+      (layout.puzzle?'<span class="rune-legend">● Rune seal</span>':'')+'<span>● Chest</span></p>');
     paintMap(get('[data-underground-chart]'));
   }
 
   function showHelp(){
     openPanel('help','Dungeon controls','<dl><div><dt>WASD</dt><dd>Walk. Drag or use ← and → to look around.</dd></div>'+
       '<div><dt>V</dt><dd>Switch first-person view on or off. Drag to aim. Click or press 1 to swing your blade.</dd></div>'+
-      '<div><dt>E</dt><dd>Open a chest, use a tower, or leave through the cave mouth.</dd></div>'+
+      '<div><dt>E</dt><dd>Open a chest, inspect a rune seal, or use a stairway, portal or exit.</dd></div>'+
       (layout.diveMouth||diving?'<div><dt>E</dt><dd>Mermaids dive and surface at rising bubbles. Bring petals and sunberries for reef friends.</dd></div>':'')+
       (diving?'':'<div><dt>1–4</dt><dd>Use your blade, arc bolt, ward or HP potion.</dd></div>')+
       '<div><dt>M</dt><dd>See the passages you have explored.</dd></div></dl>'+
@@ -728,9 +804,41 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
       '<button class="underground-primary" type="button" data-underground="build" '+(ready?'':'disabled')+'>Build Wizard Tower</button>');
   }
 
+  function showSeal(){
+    runeSequence=[];
+    const runes=Object.entries(runeSymbols).map(([id,[name,symbol]])=>
+      '<button type="button" data-underground="rune" data-rune="'+id+'">'+icon(symbol,22)+'<span>'+name+'</span></button>').join('');
+    openPanel('seal',layout.puzzle.title,'<p>'+layout.puzzle.clue+'</p><div class="underground-runes">'+runes+'</div>'+
+      '<p class="rune-feedback" role="status">Choose three runes in order.</p>'+
+      '<button type="button" class="underground-primary" data-underground="rune-reset">Clear runes</button>');
+  }
+
+  function chooseRune(id){
+    if(!Object.hasOwn(runeSymbols,id)) return;
+    runeSequence.push(id);
+    const feedback=get('.rune-feedback');
+    if(runeSequence.length<layout.puzzle.order.length){
+      feedback.textContent=runeSequence.map(rune=>runeSymbols[rune][0]).join(' → ');
+      return;
+    }
+    if(openDungeonSeal(state,runeSequence)){
+      layout.blockedGate=null;
+      field=dungeonDistanceField(layout,cell);
+      closePanel();renderPrompt();notify('The seal opens.');persist();
+      return;
+    }
+    feedback.textContent=runeSequence.map(rune=>runeSymbols[rune][0]).join(' → ')+' did not open the door. Try again.';
+    runeSequence=[];
+  }
+
   function interact(){
     const current=dungeonPrompt(layout,expedition.position,progress,expedition,state);
     if(!current||activePanel||dead) return;
+    if(current.kind==='seal'){showSeal();return;}
+    if(current.kind==='descend'||current.kind==='ascend'){
+      if(changeDungeonFloor(state,current.kind==='descend'?1:-1)){persist();remount();}
+      return;
+    }
     if(current.kind==='dive'||current.kind==='surface'){
       if(changeDiveDepth(state)){persist();remount();}
       return;
@@ -834,7 +942,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
 
   function collapse(){
     dead=true;
-    openPanel('fallen','Your lantern went out','<p>Catch your breath at the cave mouth. Your finds and towers are safe.</p>'+
+    openPanel('fallen','Your lantern went out','<p>Catch your breath at '+(layout.depth?'this floor’s entrance':'the cave mouth')+'. Your finds and towers are safe.</p>'+
       '<button class="underground-primary" type="button" data-underground="wake">Wake at the entrance</button>');
   }
 
@@ -867,6 +975,10 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     if(id==='help'&&!activePanel){showHelp();return;}
     if(id==='view'){togglePerspective();return;}
     if(id==='interact'){interact();return;}
+    if(activePanel==='seal'&&id==='rune'){chooseRune(source.dataset.rune);return;}
+    if(activePanel==='seal'&&id==='rune-reset'){
+      runeSequence=[];get('.rune-feedback').textContent='Choose three runes in order.';return;
+    }
     if(id==='build'&&activePanel==='build'){
       if(buildDungeonTower(state,layout.id)){
         closePanel();notify('Wizard Tower raised');persist();
@@ -934,7 +1046,7 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
     }
     field=dungeonDistanceField(layout,cell);
     const nextArea=diving?'Diving · '+layout.chambers[cell.zone]:cell.flooded?(state.look?.morph===5?'Swimming · Smuggler’s Channel':'Wading · Smuggler’s Channel'):cell.zone===null?'Connecting passages':layout.chambers[cell.zone];
-    if(nextArea!==area){area=nextArea;zoneLabel.textContent=area;}
+    if(nextArea!==area){area=nextArea;zoneLabel.textContent=zoneName(layout,area);}
   }
 
   function drawTarget(){
@@ -1030,6 +1142,11 @@ function mountDungeonLayer(host,state,{save=()=>{},onExit=()=>{},onTravel=()=>{}
       tower.tower.visible=Boolean(progress.towers[layout.id]);
       tower.summit.rotation.y=elapsed*.8;
     }
+    if(world.seal?.visible&&expedition.seal){
+      world.seal.position.y=T.MathUtils.damp(world.seal.position.y,3.1,8,dt);
+      if(world.seal.position.y>2.9) world.seal.visible=false;
+    }
+    for(const swirl of world.portals) swirl?.(elapsed);
     if(world.exitMarker){
       world.exitMarker.position.y=2.87+Math.sin(elapsed*3.0)*.12;
       world.exitMarker.scale.setScalar(1.02+Math.sin(elapsed*3.0)*.11);

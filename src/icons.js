@@ -19,6 +19,7 @@ const paths={
   volume:'<path d="M4 9h4l4-4v14l-4-4H4V9Zm12-.5a5 5 0 0 1 0 7m2-10a9 9 0 0 1 0 13"/>',
   mute:'<path d="M4 9h4l4-4v14l-4-4H4V9Zm13 0 5 6m0-6-5 6"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2"/>',
+  droplet:'<path d="M12 3C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 3Z"/>',
   moon:'<path d="M21 13a9 9 0 0 1-10-10 9 9 0 1 0 10 10Z"/>',
   'cloud-check':'<path d="M7 17a4 4 0 1 1 .5-8 5 5 0 0 1 9.5 1 3.5 3.5 0 0 1 0 7m-7-3 2 2 4-4"/>',
   shirt:'<path d="M8 4 3 7l2 5 3-1v9h8v-9l3 1 2-5-5-3a4 4 0 0 1-8 0Z"/>',

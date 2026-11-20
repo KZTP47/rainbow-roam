@@ -1,0 +1,55 @@
+.pet-club-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.pet-form, .pet-turn, .pet-message, .pet-birth {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: clamp(12px, 3vw, 20px);
+  color: var(--forest);
+  background: #fffaf0;
+}
+.pet-form { display: grid; gap: 14px; }
+.pet-form label { display: grid; gap: 6px; font-weight: 800; }
+.pet-form select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #c9b995;
+  border-radius: 9px;
+  color: inherit;
+  background: #fffdf6;
+  padding: 6px 10px;
+  font: inherit;
+}
+.pet-form p, .pet-turn p, .pet-birth p { margin: 0; color: var(--caption); }
+.pet-form > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.pet-form :is(button,select):focus-visible { outline: 2px solid #795381; outline-offset: 2px; }
+.pet-birth { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.pet-sprout {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 13px;
+  background: radial-gradient(circle at 37% 24%,#fff5da,var(--coat) 55%,var(--markings));
+  color: #45354d;
+}
+.pet-matchup { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; }
+.pet-fighter {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  min-width: 0;
+  gap: 6px;
+  padding: 12px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--forest);
+  background: #e5ecda;
+}
+.pet-fighter:nth-child(2) { background: #f3e1ed; color: #633e6c; }
+.pet-fighter .art-tile { width: 70px; height: 70px; border-radius: 9px; }
+.pet-fighter progress { width: min(140px,100%); height: 10px; accent-color: #587a55; }
+.pet-fighter:nth-child(2) progress { accent-color: #936094; }
+.pet-turn { margin: 10px 0; }
+.pet-turn p { margin-top: 5px; font-size: .85rem; }
+.pet-moves { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.pet-moves button { width: 100%; justify-content: center; min-height: 44px; }
+.pet-moves small { display: block; margin: 5px 3px 0; color: var(--caption); line-height: 1.25; }

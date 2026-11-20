@@ -1,4 +1,5 @@
 import {species} from './content.js';
+import {inheritedPet} from './pet-club.js';
 import {evolutionDesigns} from './evolution-designs.js';
 
 export const affinities = [4, 9];
@@ -19,7 +20,7 @@ export function friendForm(id, stage) {
 }
 
 export function currentFriend(state, id) {
-  return friendForm(id, friendStage(state, id));
+  return friendForm(id, friendStage(state, id)) ?? inheritedPet(state,species,id);
 }
 
 export function evolutionRequirement(state, id, stage) {
