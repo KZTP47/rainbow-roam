@@ -75,23 +75,43 @@ export function breedPet(state,species,first,second) {
 }
 
 export function startPetBattle(state,pet,rival) {
-  if(!Object.hasOwn(petRivals,rival)||!availablePets(state).includes(pet)) return null;
+  if(!Object.hasOwn(petRivals,rival)) return null;
   const opponent=petRivals[rival];
   if(opponent.previous&&!state.petClub.wins[opponent.previous]) return null;
+  return createBattle(state,pet,rival,opponent);
+}
+
+export function startWildPetBattle(state,species,pet,rival) {
+  if(!Object.hasOwn(species,rival)||state.companions.includes(rival)) return null;
+  const {name,kind,trust}=species[rival];
+  const moves=kind==='unicorn'||kind==='fox'?['jab','heavy','brace']:
+    kind==='snail'||kind==='axolotl'?['brace','jab','heavy']:['jab','brace','heavy'];
+  return createBattle(state,pet,rival,{name,portrait:rival,hp:30+trust*10,damage:7+trust*2,moves},true);
+}
+
+function createBattle(state,pet,rival,opponent,wild=false) {
+  if(!availablePets(state).includes(pet)) return null;
   const stage=state.evolutions?.[pet]??0;
   const friendship=state.care?.[pet]?.affinity??0;
   const maxHP=53+friendship+stage*5;
-  return {pet,rival,maxHP,hp:maxHP,rivalHP:opponent.hp,power:15+stage*2,turn:0,focus:false,result:null,log:''};
+  return {pet,rival,opponent,wild,maxHP,hp:maxHP,rivalHP:opponent.hp,power:15+stage*2,turn:0,focus:false,result:null,log:''};
+}
+
+export function catchWildPet(state,species,battle) {
+  if(!battle?.wild||battle.result!=='won'||!Object.hasOwn(species,battle.rival)||state.companions.includes(battle.rival)) return false;
+  state.companions.push(battle.rival);
+  state.bonds[battle.rival]=species[battle.rival].trust;
+  return true;
 }
 
 export function rivalMove(battle) {
-  const moves=petRivals[battle.rival].moves;
+  const moves=battle.opponent.moves;
   return moves[battle.turn%moves.length];
 }
 
 export function playPetTurn(state,battle,move) {
   if(!battle||battle.result||!Object.hasOwn(petMoves,move)) return false;
-  const opponent=petRivals[battle.rival], intent=rivalMove(battle);
+  const opponent=battle.opponent, intent=rivalMove(battle);
   const incoming=intent==='brace'?0:opponent.damage+(intent==='heavy'?14:0);
   const events=[];
   if(move==='focus'){
@@ -112,7 +132,7 @@ export function playPetTurn(state,battle,move) {
   }
   if(battle.rivalHP===0){
     battle.result='won';
-    if(!state.petClub.wins[battle.rival]){
+    if(!battle.wild&&!state.petClub.wins[battle.rival]){
       state.petClub.wins[battle.rival]=true;
       state.wallet.coins+=opponent.coins;
       state.inventory.treat=(state.inventory.treat??0)+1;

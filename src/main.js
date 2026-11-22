@@ -17,7 +17,7 @@ import {wardrobe,defaultLook} from './wardrobe.js';
 import {atlas,homeland,houses,spells} from './horizons.js';
 import {loadGame,saveGame,readSaveFile,downloadSave} from './save-files.js';
 import {currentFriend,evolveFriend} from './evolutions.js';
-import {breedPet,playPetTurn,startPetBattle} from './pet-club.js';
+import {breedPet,catchWildPet,playPetTurn,startPetBattle,startWildPetBattle} from './pet-club.js';
 import {home,currencies,cropFood,extensions,workHomestead,propertyArea,propertyArrival,nearHomestead,wizardTowerPoint} from './homestead.js';
 import {makeHomestead} from './homestead-art.js';
 import {marketAtPlace,transact} from './market.js';
@@ -46,7 +46,7 @@ const travelPoints={village:[0,10],grove:[-24,-10],lake:[14,-6],ridge:[29,-41],f
 const propertyView=()=>propertyArea(state.player,state.realm,state.homestead);
 let world,createWorld,active=false,building=false,starting=false,importing=false,propertyEntry=propertyView();
 let dungeonCleanup=null,dungeonLoading=false,physicalHome=false,autoPropertyView=null;
-let saveMode,petBattle=null;
+let saveMode,petBattle=null,wildEncounter=null;
 const ui=createUI(app,state,{start,action,mapHeight:(realm,x,z)=>world?.mapHeight(realm,x,z),
   drawOutfit:(canvas,framing)=>world?.drawOutfit(canvas,framing),sproutPicture:spec=>world?.sproutPicture(spec),
   walkRenderer:()=>world?.renderer,propertyPreview:view=>world?.propertyPreview(view),
@@ -189,7 +189,7 @@ function mountWorld() {
     relayTimeout(){ui.toast('The lanterns dimmed','Return to the market lantern to try again.','sparkles');},
     combatReport({title,detail,icon}){ui.toast(title,detail,icon);ui.refresh();persist();},
     update(candidate,elapsed,landing,room){ui.update(currentRegion.id,candidate,state.time,elapsed,landing,room);},
-    aim:ui.setReticle,
+    aim:ui.setReticle,wildEncounter:meetWildPet,
     place:placeBlock,remove:removeBlock,
     lost(value){
       world?.setLost(value);
@@ -237,7 +237,8 @@ function travel(id,allowUndiscovered=false,arrival=null) {
 
 function menu(id, detail) {
   if(id!=='homestead') autoPropertyView=null;
-  if(id!=='petArena') petBattle=null;
+  if(id!=='petArena'&&id!=='wildEncounter') petBattle=null;
+  if(id!=='wildEncounter') wildEncounter=null;
   ui.showPanel(id,detail);
   world?.setPaused(Boolean(id));
 }
@@ -338,10 +339,21 @@ function finishQuest(id) {
   ui.toast('Quest complete',npc.quest+' · +10 Suncoins','check');
   audio.play('success');refresh();
 }
-function interact() {
+function meetWildPet(id) {
+  if(!active||building||ui.opened||dungeonCleanup||dungeonLoading||state.transit||
+    !ownsGameWindow()||state.companions.includes(id)) return;
+  wildEncounter=id;
+  menu('wildEncounter',{id});
+}
+
+function interact(challenge=false) {
   if(ui.opened) return;
   const target=world?.interaction();
   if(!target) return;
+  if(challenge){
+    if(target.kind==='wild') meetWildPet(target.id);
+    return;
+  }
   if(target.kind==='npc') talk(target.id);
   else if(target.kind==='trail-landmark') trailGames.visit('landmark');
   else if(target.kind==='dungeon') openDungeon(target.id);
@@ -610,13 +622,38 @@ function action(type,id) {
       return;
     }
     case 'pet-turn':
-      if(active&&ui.opened==='petArena'&&ownsGameWindow()&&playPetTurn(state,petBattle,id)){
+      if(active&&['petArena','wildEncounter'].includes(ui.opened)&&ownsGameWindow()&&playPetTurn(state,petBattle,id)){
         ui.refresh();
-        if(petBattle.result==='won'){audio.play('success');persist();}
+        if(petBattle.result==='won'){
+          audio.play('success');
+          if(!petBattle.wild) persist();
+        }
       }
       return;
     case 'pet-rematch':
       if(ui.opened==='petArena'&&petBattle?.result){petBattle=null;menu('petArena');}
+      return;
+    case 'wild-match':
+      if(active&&ui.opened==='wildEncounter'&&ownsGameWindow()&&!petBattle){
+        petBattle=startWildPetBattle(state,species,id,wildEncounter);
+        if(petBattle) menu('wildEncounter',{id:wildEncounter,battle:petBattle});
+      }
+      return;
+    case 'wild-rematch':
+      if(ui.opened==='wildEncounter'&&petBattle?.result==='lost'){
+        petBattle=null;
+        menu('wildEncounter',{id:wildEncounter});
+      }
+      return;
+    case 'wild-catch':
+      if(active&&ui.opened==='wildEncounter'&&ownsGameWindow()&&catchWildPet(state,species,petBattle)){
+        const {name}=species[petBattle.rival];
+        menu(null);
+        world.syncTracking();
+        ui.toast(name+' joined your Friends!','Find your new companion in the Field Guide.','paw');
+        audio.play('success');
+        refresh();
+      }
       return;
     case 'pet-pair': {
       if(!active||ui.opened!=='petNursery'||!ownsGameWindow()) return;
@@ -866,7 +903,7 @@ window.addEventListener('keydown',e=>{
   }
   if(e.repeat) return;
   if(keyPanels[key]) {e.preventDefault();action(keyPanels[key]);return;}
-  if(key==='e') interact();
+  if(key==='e') interact(e.shiftKey);
   else if(key==='f'){e.preventDefault();action('flight');}
   else if(key==='b') action('build');
   else if(key==='r'&&building) world.rotate();

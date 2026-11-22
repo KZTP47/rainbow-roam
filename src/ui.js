@@ -203,7 +203,7 @@ export function createUI(root, state, actions, hasSave) {
   const outfitSections={appearance:['morph','skin','eyes','beard'],hair:['style','hair'],clothes:['outfit','coat','accessory']};
   movableHotbar(el('toolbar'),'tools');
   movableHotbar(el('adventure-hotbar'),'adventure');
-  const controls=[['W A S D','Move'],['Drag mouse','Look around'],['Shift','Run'],['Space','Jump'],['E','Talk, gather or offer a treat'],['B','Toggle build mode'],['Left click','Place in build mode or strike in combat'],['Right click','Retrieve a building piece or lock on in combat'],['R','Rotate a building piece'],['1–7','Select a building piece'],['I / C / K / J / M','Bag / Friends / Craft / Journal / Map'],['V / P / T','Voyage atlas / Companion care / Spellbook'],['L / U / Y / N','Market / Homestead / Bounties / Town life'],['Z / H / Q','Strike / Bow / Lock target'],['Hold G / X','Guard / Dodge on land'],['Esc','Close the current panel']];
+  const controls=[['W A S D','Move'],['Drag mouse','Look around'],['Shift','Run'],['Space','Jump'],['E','Talk, gather or offer a treat'],['Left click / Tap','Challenge a nearby wild friend'],['Shift + E','Challenge the wild friend at the interaction prompt'],['B','Toggle build mode'],['Left click','Place in build mode or strike in combat'],['Right click','Retrieve a building piece or lock on in combat'],['R','Rotate a building piece'],['1–7','Select a building piece'],['I / C / K / J / M','Bag / Friends / Craft / Journal / Map'],['V / P / T','Voyage atlas / Companion care / Spellbook'],['L / U / Y / N','Market / Homestead / Bounties / Town life'],['Z / H / Q','Strike / Bow / Lock target'],['Hold G / X','Guard / Dodge on land'],['Esc','Close the current panel']];
 
   function sound() {
     for(const id of ['sound','cover-audio']) {
@@ -555,14 +555,42 @@ export function createUI(root, state, actions, hasSave) {
         <div><button class="primary" type="submit">Start battle</button>${back}</div>
       </form>`;
     }
-    const rival=petRivals[battle.rival],pet=currentFriend(state,battle.pet);
+    const result=action('Choose a match','pet-rematch','sword')+back;
+    return battleView(battle,result);
+  }
+
+  function wildEncounter(){
+    const {id,battle}=detail;
+    const leave=action('Leave','close',null,'','small-action');
+    if(battle){
+      const result=battle.result==='won'
+        ? action('Catch '+species[id].name,'wild-catch','paw')
+        : action('Try again','wild-rematch','sword');
+      return battleView(battle,result+leave);
+    }
+    const spec=species[id],eligible=availablePets(state);
+    const introduction=`<div class="wild-intro">${friendPortrait(id)}<div><strong>${spec.family}</strong><p>${spec.place}</p></div></div>`;
+    if(!eligible.length){
+      const hint=state.companions.length?'Bring an available companion to battle.':
+        'Offer a treat to a wild friend first so you have a companion to battle with.';
+      return `${introduction}<p class="pet-message">${hint}</p>${leave}`;
+    }
+    return `${introduction}<form class="pet-form" data-pet-form="wild-match">
+      <label>Your companion <select name="pet" required>${petOptions(eligible,state.active)}</select></label>
+      <p>Win the battle to catch ${spec.name} and add them to your Friends.</p>
+      <div><button class="primary" type="submit">Start battle</button>${leave}</div>
+    </form>`;
+  }
+
+  function battleView(battle,resultActions){
+    const rival=battle.opponent,pet=currentFriend(state,battle.pet);
     const fighter=(name,art,hp,max)=>`<div class="pet-fighter">${art}<strong>${name}</strong>
       <progress aria-label="${name} health" value="${hp}" max="${max}"></progress><small>${hp} / ${max} HP</small></div>`;
-    return `<div class="pet-matchup">${fighter(pet.name,friendPortrait(battle.pet),battle.hp,battle.maxHP)}
+    return `<div class="pet-matchup${battle.wild?' wild-matchup':''}">${fighter(pet.name,friendPortrait(battle.pet),battle.hp,battle.maxHP)}
       ${fighter(rival.name,portrait(rival.portrait,'field'),battle.rivalHP,rival.hp)}</div>
       <div class="pet-turn" role="status"><strong>${battle.result==='won'?'Victory!':battle.result==='lost'?'Your companion is ready to rest':'Turn '+(battle.turn+1)+' · '+rivalCues[rivalMove(battle)]}</strong>
       ${battle.log?`<p>${battle.log}</p>`:''}</div>
-      ${battle.result?`<div class="pet-club-links">${action('Choose a match','pet-rematch','sword')}${back}</div>`:
+      ${battle.result?`<div class="pet-club-links">${resultActions}</div>`:
         `<div class="pet-moves">${Object.entries(petMoves).map(([id,[name,symbol,description]])=>
           `<div>${action(name,'pet-turn:'+id,symbol,'aria-describedby="move-'+id+'"','small-action')}<small id="move-${id}">${description}</small></div>`).join('')}</div>`}`;
   }
@@ -658,7 +686,7 @@ export function createUI(root, state, actions, hasSave) {
   }
 
   const views={...frontier.views,activities:()=>town.render(),craft:crafting,journal,companions,map,wardrobe:dressingRoom,settings,
-    atlas:voyageAtlas,care:companionCare,petArena,petNursery,sorting,spells:spellbook,time:timeOfDay,wizardTower};
+    atlas:voyageAtlas,care:companionCare,petArena,petNursery,wildEncounter,sorting,spells:spellbook,time:timeOfDay,wizardTower};
   function refresh() {
     objective(); activeBuddy(); sound();
     if(opened) drawPanel();
@@ -715,9 +743,9 @@ export function createUI(root, state, actions, hasSave) {
           ${action(button,command,choices?null:'arrow-right','',choices?'small-action':'primary')}</div></section>`;
       return;
     }
-    const [symbol,title,subtitle]=panels[opened];
+    const [symbol,title,subtitle]=opened==='wildEncounter'?['paw',species[detail.id].name,'Wild encounter']:panels[opened];
     const property=opened==='homestead'&&state.homestead.owned&&nearHomestead(state);
-    const folio=['craft','journal','companions','petArena','petNursery','atlas','market','bounties','activities'].includes(opened);
+    const folio=['craft','journal','companions','petArena','petNursery','wildEncounter','atlas','market','bounties','activities'].includes(opened);
     const mode=opened==='map'?'map':property?'property':folio?'folio':null;
     overlay.className='drawer-overlay'+(mode?' '+mode+'-overlay':'');
     overlay.innerHTML=`<aside role="dialog" aria-modal="true" aria-labelledby="panel-title" class="drawer${mode?' '+mode+'-drawer':''}" data-panel="${opened}">
@@ -744,8 +772,8 @@ export function createUI(root, state, actions, hasSave) {
     if(focused){
       const button=[...overlay.querySelectorAll('button')].find(b=>b.dataset.action===focused&&!b.disabled);
       if(button) button.focus({preventScroll:true});
-      else if(focused.startsWith('pet-turn:')&&opened==='petArena'){
-        overlay.querySelector('[data-action="pet-rematch"]')?.focus({preventScroll:true});
+      else if(focused.startsWith('pet-turn:')){
+        overlay.querySelector('[data-action="pet-rematch"],[data-action="wild-rematch"],[data-action="wild-catch"]')?.focus();
       }
       else if(focused.startsWith('evolve-friend:')){
         const form=overlay.querySelector('.evolution-stage[aria-current="step"] h4');
@@ -817,6 +845,10 @@ export function createUI(root, state, actions, hasSave) {
     if(!form.dataset.petForm) return;
     event.preventDefault();
     const values=new FormData(form);
+    if(form.dataset.petForm==='wild-match'){
+      actions.action('wild-match',values.get('pet'));
+      return;
+    }
     const fields=form.dataset.petForm==='pet-match'?['pet','rival']:['first','second'];
     actions.action(form.dataset.petForm,fields.map(field=>values.get(field)).join('/'));
   });

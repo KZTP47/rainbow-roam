@@ -34,6 +34,7 @@ import {caveObstructs,cavePoints,createDoorSignals,drawCave,roomDoorSignal} from
 import {dungeonEntrances} from './dungeons.js';
 
 const GRID=1.2;
+const wildEncounterRange=9;
 const TAU=Math.PI*2;
 const SCALE_MAX=1.5;
 const v=new T.Vector3();
@@ -196,9 +197,10 @@ export function createWorld(container,state,callback) {
   let buddy=null,buddyId=null,buddyStage=0,followTarget=null;
   let building=false,selected=null,rotation=0,preview=null,previewType=null;
   let elapsed=0,lastFrame=0,prevUi=0,prevSun=0,freeLookUntil=0;
-  let keys=new Set(),gesture=null, mouseAim=false;
+  let keys=new Set(),gesture=null, mouseAim=false,wildClick=false;
   const target=new T.Vector3(),ideal=new T.Vector3();
   const ray=new T.Raycaster(),screen=new T.Vector2(0,0),pointer=new T.Vector2(0,0);
+  const wildRay=new T.Raycaster();
   const blockMap=new Map();
   const parcelGeometry=new T.BoxGeometry(1.195,1.2,1.195);
   const proxyMat=new T.MeshBasicMaterial({visible:false});
@@ -1116,7 +1118,7 @@ export function createWorld(container,state,callback) {
     for(const a of wild) {
       if(state.companions.includes(a.id)) continue;
       const d=distance(a.x,a.z);
-      if(d<3.15) candidates.push({d:source?.kind==='creature'&&source.id===a.id?-3:d,kind:'wild',id:a.id,label:'Offer '+items[a.data.favorite][0].toLowerCase(),hint:a.data.name+' · '+(state.bonds[a.id]??0)+'/'+a.data.trust+' trust'});
+      if(d<3.15) candidates.push({d:source?.kind==='creature'&&source.id===a.id?-3:d,kind:'wild',id:a.id,label:'Offer '+items[a.data.favorite][0].toLowerCase(),hint:a.data.name+' · '+(state.bonds[a.id]??0)+'/'+a.data.trust+' trust · Click or tap to challenge'});
     }
     for(const [x,z] of gates){
       const d=distance(x,z);
@@ -1272,6 +1274,40 @@ export function createWorld(container,state,callback) {
     else if(!(state.inventory[selected]>0)) callback.blockError('Craft more at your bench first.');
   }
 
+  function wildPick(aim) {
+    if(!active||paused||building||contextLost||cameraRoom||state.transit||!grounded||combat.isFighting()) return null;
+    const p=state.player;
+    wildRay.setFromCamera(aim,camera);
+    wildRay.near=camera.near;
+    wildRay.far=Infinity;
+    let closest=null,depth=Infinity;
+    const hits=[];
+    for(const animal of wild){
+      if(state.companions.includes(animal.id)||Math.hypot(animal.x-p.x,animal.z-p.z)>wildEncounterRange) continue;
+      animal.look.group.traverseVisible(mesh=>{
+        if(!mesh.isMesh) return;
+        hits.length=0;
+        wildRay.intersectObject(mesh,false,hits);
+        if(hits.length&&hits[0].distance<depth){
+          closest=animal.id;depth=hits[0].distance;
+        }
+      });
+    }
+    if(!closest) return null;
+
+    // The creature must be in front of terrain and opaque scenery or actors.
+    wildRay.far=depth-.001;
+    let blocked=false;
+    scene.traverseVisible(mesh=>{
+      if(blocked||!mesh.isMesh||!mesh.layers.test(camera.layers)) return;
+      if(mesh!==landscape.ground&&(!mesh.castShadow||!mesh.material.visible||mesh.material.transparent)) return;
+      hits.length=0;
+      wildRay.intersectObject(mesh,false,hits);
+      blocked=hits.length>0;
+    });
+    return blocked?null:closest;
+  }
+
   let frameId;
   function frame(ms) {
     frameId=requestAnimationFrame(frame);
@@ -1335,7 +1371,8 @@ export function createWorld(container,state,callback) {
   window.addEventListener('keyup',e=>{if(e.key.toLowerCase()==='g') combat.action('guard-off');},options);
   window.addEventListener('blur',()=>combat.action('guard-off'),options);
   canvas.addEventListener('pointerdown',e=>{
-    if(!active||paused||e.button>2) return;
+    if(!active||paused||gesture||e.button>2) return;
+    wildClick=false;
     gesture={id:e.pointerId,x:e.clientX,y:e.clientY,travel:0,button:e.button};
     canvas.setPointerCapture(e.pointerId);
   },options);
@@ -1363,18 +1400,30 @@ export function createWorld(container,state,callback) {
   },options);
   canvas.addEventListener('pointerup',e=>{
     if(!gesture||e.pointerId!==gesture.id) return;
-    const rect=canvas.getBoundingClientRect();
-    pointer.set((e.clientX-rect.left)/rect.width*2-1,1-(e.clientY-rect.top)/rect.height*2);
-    if(gesture.travel<6){
-      if(building) tryBlock(gesture.button===2,pointer);
-      else if(e.pointerType==='mouse'){
-        if(gesture.button===0) combat.action('attack');
-        if(gesture.button===2) combat.action('lock');
-      }
-    }
+    const {button,travel}=gesture;
     gesture=null;
+    readPointer(e);
+    if(travel>=6) return;
+    if(building) tryBlock(button===2,pointer);
+    else if(combat.isFighting()&&e.pointerType==='mouse'){
+      if(button===0) combat.action('attack');
+      if(button===2) combat.action('lock');
+    } else wildClick=button===0&&travel<=3&&Math.abs(pointer.x)<=1&&Math.abs(pointer.y)<=1;
   },options);
-  canvas.addEventListener('pointercancel',()=>{gesture=null;mouseAim=false;},options);
+  canvas.addEventListener('click',e=>{
+    if(!wildClick||e.button!==0) return;
+    wildClick=false;
+    readPointer(e);
+    // Opening on pointerup makes touch browsers send the follow-up click to the new overlay.
+    const id=wildPick(pointer);
+    if(id) callback.wildEncounter(id);
+  },options);
+  function cancelGesture(e){
+    if(gesture?.id!==e.pointerId) return;
+    gesture=null;mouseAim=false;
+  }
+  canvas.addEventListener('pointercancel',cancelGesture,options);
+  canvas.addEventListener('lostpointercapture',cancelGesture,options);
   canvas.addEventListener('pointerleave',()=>{mouseAim=false;combat.aim(null);},options);
   function zoomRoom(delta){
     if(cameraRoom) roomZoom=T.MathUtils.clamp(roomZoom+delta,.65,1.35);
@@ -1413,7 +1462,7 @@ export function createWorld(container,state,callback) {
       canvas.remove();
     },
     setActive(value) {active=value;combat.setActive(value);if(value) resetCamera();else keys.clear();},
-    setPaused(value) {paused=value;combat.setPaused(value);needsRender=true;keys.clear();gesture=null;},
+    setPaused(value) {paused=value;combat.setPaused(value);needsRender=true;keys.clear();gesture=null;wildClick=false;},
     setLost(value) {contextLost=value;},
     setKey(key,on){if(on) keys.add(key);else keys.delete(key);},
     clearKeys(){keys.clear();},
