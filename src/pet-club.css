@@ -65,15 +65,76 @@
 }
 .wild-intro .art-tile { width: 60px; height: 60px; border-radius: 12px; }
 .wild-intro p { margin: 2px 0 0; color: var(--caption); }
-.wild-matchup {
-  padding: clamp(8px, 2.5vw, 18px);
-  border: 1px solid #c7d8bc;
-  border-radius: 16px;
-  background: linear-gradient(160deg, #e5eff0, #edeee0 66%, #d9e5c8);
+.wild-arena-mode #hud { visibility: hidden; }
+#overlay.wild-arena-overlay {
+  background: linear-gradient(180deg, #223b3666, transparent 28%, transparent 58%, #25372b70);
 }
-.wild-matchup .pet-fighter { background: #f8fbf0; }
-.wild-matchup .pet-fighter:nth-child(2) { background: #fff5f5; }
-.wild-matchup .pet-fighter .art-tile {
-  width: clamp(62px, 16vw, 106px);
-  height: clamp(62px, 16vw, 106px);
+.wild-arena-interface {
+  --arena-edge: clamp(10px, 2.65vw, 38px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 0;
+  padding: max(var(--arena-edge), env(safe-area-inset-top)) max(var(--arena-edge), env(safe-area-inset-right))
+    max(var(--arena-edge), env(safe-area-inset-bottom)) max(var(--arena-edge), env(safe-area-inset-left));
+  overflow: auto;
+}
+.wild-arena-head {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto;
+  gap: clamp(6px, 1.1vw, 14px);
+  width: min(1160px, 100%);
+  margin-inline: auto;
+  align-items: start;
+}
+.wild-arena-head .close { width: 42px; height: 42px; }
+.wild-health {
+  --health-tone: #447756;
+  width: min(100%, 260px);
+  padding: clamp(8px, 1.4vw, 15px);
+  border: 1px solid #faf2d8;
+  border-radius: 14px;
+  background: #fff9ed;
+  color: #3d5949;
+  box-shadow: 0 5px 20px #30493935;
+}
+.wild-health:nth-child(2) { justify-self: end; --health-tone: #925880; color: #694565; }
+.wild-health > span { font-size: .69rem; font-weight: 800; }
+.wild-health h2 {
+  margin: 1px 0 7px;
+  overflow-wrap: anywhere;
+  font: 700 clamp(.95rem, 3.5vw, 1.55rem)/1.08 Fraunces, Georgia, serif;
+}
+.wild-health > div { display: flex; align-items: center; gap: 8px; }
+.wild-health progress { accent-color: var(--health-tone); flex: 1; min-width: 0; height: 11px; }
+.wild-health small { font-size: .73rem; font-weight: 800; white-space: nowrap; }
+.wild-arena-controls {
+  width: min(640px, 100%);
+  margin: auto auto 0;
+  padding: clamp(10px, 1.7vw, 19px);
+  border: 1px solid #faf2d8;
+  border-radius: 16px;
+  background: #fff9ed;
+  color: #334e3f;
+  box-shadow: 0 9px 30px #273c3766;
+}
+.wild-arena-status { min-height: 49px; margin-bottom: 7px; }
+.wild-arena-status p { margin: 3px 0 0; color: #665d4d; font-size: .83rem; line-height: 1.22; }
+.wild-arena-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.wild-arena-actions .pet-moves { width: 100%; }
+.wild-arena-actions .pet-moves button { font-size: .82rem; }
+.wild-arena-actions .pet-moves button[aria-disabled="true"] { opacity: .68; cursor: wait; }
+.wild-arena-actions .pet-moves small { color: #5c5a4b; }
+@media (max-width: 500px) {
+  .wild-health > div { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .wild-health progress { flex: none; width: 100%; height: 8px; }
+  .wild-health h2 { margin-bottom: 5px; }
+  .wild-arena-controls .pet-moves small { font-size: .72rem; }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .wild-arena-interface { --arena-edge: 8px; }
+  .wild-arena-controls { padding: 8px 12px; }
+  .wild-arena-status { min-height: 25px; margin-bottom: 4px; }
+  .wild-arena-controls .pet-moves small { margin-top: 3px; }
 }

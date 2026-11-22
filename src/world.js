@@ -32,6 +32,7 @@ import {atStairs,canMoveOnShip,gangplank,inHold,marigold,onMarigold,onShip,stair
 import {dialFaces,inRoom,roomFloorOffset,roomPoint,rooms} from './spirehaven-rooms.js';
 import {caveObstructs,cavePoints,createDoorSignals,drawCave,roomDoorSignal} from './adventure-doors.js';
 import {dungeonEntrances} from './dungeons.js';
+import {createWildArena} from './wild-arena.js';
 
 const GRID=1.2;
 const wildEncounterRange=9;
@@ -194,6 +195,7 @@ export function createWorld(container,state,callback) {
   const inSpirehaven=({x,z})=>realm==='silverrun'&&x>silverrunWalls.west&&x<silverrunWalls.east&&z>silverrunWalls.north&&z<silverrunWalls.south;
   let pitch=inSpirehaven(state.player)?.08:.24, distance=9.6;
   let active=false, paused=false, contextLost=false, needsRender=true;
+  let wildArena=null;
   let buddy=null,buddyId=null,buddyStage=0,followTarget=null;
   let building=false,selected=null,rotation=0,preview=null,previewType=null;
   let elapsed=0,lastFrame=0,prevUi=0,prevSun=0,freeLookUntil=0;
@@ -1312,9 +1314,13 @@ export function createWorld(container,state,callback) {
   function frame(ms) {
     frameId=requestAnimationFrame(frame);
     if(!active||contextLost) {lastFrame=ms;return;}
-    if(ms-lastFrame<13 || paused&&!needsRender) return;
+    if(ms-lastFrame<13 || paused&&!needsRender&&!wildArena) return;
     const dt=Math.min((ms-lastFrame)/1000,.11)||.016;
     lastFrame=ms;
+    if(wildArena){
+      wildArena.frame(renderer,dt,canvas.width,canvas.height);
+      return;
+    }
     if(!paused){
       elapsed+=dt;updateRelay();
       state.time=(state.time+dt*.038)%24;
@@ -1362,6 +1368,14 @@ export function createWorld(container,state,callback) {
   resetCamera();
   frameId=requestAnimationFrame(frame);
   const canvas=renderer.domElement;
+  function closeWildArena(){
+    if(!wildArena) return;
+    wildArena.dispose();
+    wildArena=null;
+    delete canvas.dataset.scene;
+    canvas.setAttribute('aria-label','3D view. Drag to look around.');
+    needsRender=true;
+  }
   const fightKeys={z:'attack',h:'bow',q:'lock',g:'guard-on',x:'dodge'};
   window.addEventListener('keydown',e=>{
     if(e.ctrlKey||e.metaKey||e.altKey||e.repeat||e.target.closest?.('input,textarea,select,[contenteditable]')||building) return;
@@ -1450,7 +1464,19 @@ export function createWorld(container,state,callback) {
       keys=new Set(keysHeld);resetCamera();
     },
     companionAction,introduceBuddy,scoutNearby,castEffect,collectLoot,studyNearby,takePostcard,propertyPreview,
+    openWildArena(pet,rival){
+      closeWildArena();
+      wildArena=createWildArena(currentFriend(state,pet),species[rival],{
+        sprout:Object.hasOwn(state.petClub.offspring,pet),
+        reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches
+      });
+      canvas.dataset.scene='wild-arena';
+      canvas.setAttribute('aria-label','3D wild battle arena');
+    },
+    playWildArenaTurn(steps,onStep,onImpact,onComplete){wildArena.play(steps,onStep,onImpact,onComplete);},
+    closeWildArena,
     destroy(){
+      closeWildArena();
       relayHud?.remove();cancelAnimationFrame(frameId);events.abort();
       for(const actor of [...agents,...wild]) actor.name.remove();
       scoutLabel.remove();
@@ -1463,7 +1489,7 @@ export function createWorld(container,state,callback) {
     },
     setActive(value) {active=value;combat.setActive(value);if(value) resetCamera();else keys.clear();},
     setPaused(value) {paused=value;combat.setPaused(value);needsRender=true;keys.clear();gesture=null;wildClick=false;},
-    setLost(value) {contextLost=value;},
+    setLost(value) {contextLost=value;needsRender=true;},
     setKey(key,on){if(on) keys.add(key);else keys.delete(key);},
     clearKeys(){keys.clear();},
     jump(){if(active&&!paused&&grounded){grounded=false;speedY=7.0;}},

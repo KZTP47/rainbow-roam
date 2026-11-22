@@ -46,7 +46,7 @@ const travelPoints={village:[0,10],grove:[-24,-10],lake:[14,-6],ridge:[29,-41],f
 const propertyView=()=>propertyArea(state.player,state.realm,state.homestead);
 let world,createWorld,active=false,building=false,starting=false,importing=false,propertyEntry=propertyView();
 let dungeonCleanup=null,dungeonLoading=false,physicalHome=false,autoPropertyView=null;
-let saveMode,petBattle=null,wildEncounter=null;
+let saveMode,petBattle=null,wildEncounter=null,wildTurn=false;
 const ui=createUI(app,state,{start,action,mapHeight:(realm,x,z)=>world?.mapHeight(realm,x,z),
   drawOutfit:(canvas,framing)=>world?.drawOutfit(canvas,framing),sproutPicture:spec=>world?.sproutPicture(spec),
   walkRenderer:()=>world?.renderer,propertyPreview:view=>world?.propertyPreview(view),
@@ -237,6 +237,10 @@ function travel(id,allowUndiscovered=false,arrival=null) {
 
 function menu(id, detail) {
   if(id!=='homestead') autoPropertyView=null;
+  if(id!=='wildEncounter'||!detail?.battle){
+    world?.closeWildArena();
+    wildTurn=false;
+  }
   if(id!=='petArena'&&id!=='wildEncounter') petBattle=null;
   if(id!=='wildEncounter') wildEncounter=null;
   ui.showPanel(id,detail);
@@ -344,6 +348,27 @@ function meetWildPet(id) {
     !ownsGameWindow()||state.companions.includes(id)) return;
   wildEncounter=id;
   menu('wildEncounter',{id});
+}
+
+function playWildTurn(move) {
+  if(wildTurn||!petBattle) return;
+  const {hp,rivalHP}=petBattle;
+  const playback={hp,rivalHP,step:null};
+  const steps=[];
+  if(!playPetTurn(state,petBattle,move,steps)) return;
+  wildTurn=true;
+  world.playWildArenaTurn(steps,step=>{
+    playback.step=step;
+    ui.updateWildBattle(playback);
+  },step=>{
+    playback.hp=step.hp;
+    playback.rivalHP=step.rivalHP;
+    ui.updateWildBattle(playback);
+  },()=>{
+    wildTurn=false;
+    ui.updateWildBattle(null);
+    if(petBattle.result==='won') audio.play('success');
+  });
 }
 
 function interact(challenge=false) {
@@ -622,11 +647,13 @@ function action(type,id) {
       return;
     }
     case 'pet-turn':
-      if(active&&['petArena','wildEncounter'].includes(ui.opened)&&ownsGameWindow()&&playPetTurn(state,petBattle,id)){
+      if(!active||!ownsGameWindow()) return;
+      if(ui.opened==='wildEncounter'){playWildTurn(id);return;}
+      if(ui.opened==='petArena'&&playPetTurn(state,petBattle,id)){
         ui.refresh();
         if(petBattle.result==='won'){
           audio.play('success');
-          if(!petBattle.wild) persist();
+          persist();
         }
       }
       return;
@@ -636,17 +663,20 @@ function action(type,id) {
     case 'wild-match':
       if(active&&ui.opened==='wildEncounter'&&ownsGameWindow()&&!petBattle){
         petBattle=startWildPetBattle(state,species,id,wildEncounter);
-        if(petBattle) menu('wildEncounter',{id:wildEncounter,battle:petBattle});
+        if(petBattle){
+          world.openWildArena(petBattle.pet,petBattle.rival);
+          menu('wildEncounter',{id:wildEncounter,battle:petBattle});
+        }
       }
       return;
     case 'wild-rematch':
-      if(ui.opened==='wildEncounter'&&petBattle?.result==='lost'){
+      if(ui.opened==='wildEncounter'&&!wildTurn&&petBattle?.result==='lost'){
         petBattle=null;
         menu('wildEncounter',{id:wildEncounter});
       }
       return;
     case 'wild-catch':
-      if(active&&ui.opened==='wildEncounter'&&ownsGameWindow()&&catchWildPet(state,species,petBattle)){
+      if(active&&ui.opened==='wildEncounter'&&!wildTurn&&ownsGameWindow()&&catchWildPet(state,species,petBattle)){
         const {name}=species[petBattle.rival];
         menu(null);
         world.syncTracking();

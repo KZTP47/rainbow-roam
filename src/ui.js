@@ -42,6 +42,10 @@ const panels={
   activities:['house','Town life','Services, discoveries and traveling tools'],
   bounties:['compass','Ranger bounty board','Keep the trails safe for your friends']
 };
+const stageMoves={
+  strike:'uses Strike.', counter:'guards and counters!', guard:'takes a defensive stance.',
+  focus:'gathers energy.', jab:'dashes in!', heavy:'charges!', brace:'braces.'
+};
 const nav=[['bag','Bag','I'],['companions','Friends','C'],['craft','Craft','K'],['journal','Journal','J'],['map','Map','M']];
 const quickSlots=[['attack','Strike','sword'],['bow','Bow','bow'],['dodge','Dodge','wind'],['potion','Heartleaf potion','heart']];
 const itemIcon=(id)=>icon(items[id][1]);
@@ -193,7 +197,7 @@ export function createUI(root, state, actions, hasSave) {
 
   const el=(id)=>root.querySelector('#'+id);
   const overlay=el('overlay'), hud=el('hud');
-  let opened=null, detail=null, returnFocus=null;
+  let opened=null, detail=null, returnFocus=null,wildPlayback=null;
   let saveMessage='',saveMessageKind='',propertyCleanup=null,entryPreviews={};
   const frontier=frontierPanels(state,{action,itemBadge,trackItem,propertyPreview:view=>entryPreviews[view]??=(actions.propertyPreview?.(view)??''),wantedBadge:id=>portrait(id,'wanted')});
   const town=createTownPanel(state,{action,itemBadge,trackItem,fieldBadge:id=>portrait(id,'field'),friendPortrait,activityContext:actions.activityContext});
@@ -560,14 +564,8 @@ export function createUI(root, state, actions, hasSave) {
   }
 
   function wildEncounter(){
-    const {id,battle}=detail;
+    const {id}=detail;
     const leave=action('Leave','close',null,'','small-action');
-    if(battle){
-      const result=battle.result==='won'
-        ? action('Catch '+species[id].name,'wild-catch','paw')
-        : action('Try again','wild-rematch','sword');
-      return battleView(battle,result+leave);
-    }
     const spec=species[id],eligible=availablePets(state);
     const introduction=`<div class="wild-intro">${friendPortrait(id)}<div><strong>${spec.family}</strong><p>${spec.place}</p></div></div>`;
     if(!eligible.length){
@@ -586,13 +584,69 @@ export function createUI(root, state, actions, hasSave) {
     const rival=battle.opponent,pet=currentFriend(state,battle.pet);
     const fighter=(name,art,hp,max)=>`<div class="pet-fighter">${art}<strong>${name}</strong>
       <progress aria-label="${name} health" value="${hp}" max="${max}"></progress><small>${hp} / ${max} HP</small></div>`;
-    return `<div class="pet-matchup${battle.wild?' wild-matchup':''}">${fighter(pet.name,friendPortrait(battle.pet),battle.hp,battle.maxHP)}
+    return `<div class="pet-matchup">${fighter(pet.name,friendPortrait(battle.pet),battle.hp,battle.maxHP)}
       ${fighter(rival.name,portrait(rival.portrait,'field'),battle.rivalHP,rival.hp)}</div>
       <div class="pet-turn" role="status"><strong>${battle.result==='won'?'Victory!':battle.result==='lost'?'Your companion is ready to rest':'Turn '+(battle.turn+1)+' · '+rivalCues[rivalMove(battle)]}</strong>
       ${battle.log?`<p>${battle.log}</p>`:''}</div>
       ${battle.result?`<div class="pet-club-links">${resultActions}</div>`:
-        `<div class="pet-moves">${Object.entries(petMoves).map(([id,[name,symbol,description]])=>
-          `<div>${action(name,'pet-turn:'+id,symbol,'aria-describedby="move-'+id+'"','small-action')}<small id="move-${id}">${description}</small></div>`).join('')}</div>`}`;
+        battleMoves()}`;
+  }
+
+  function battleMoves(){
+    return `<div class="pet-moves">${Object.entries(petMoves).map(([id,[name,symbol,description]])=>
+      `<div>${action(name,'pet-turn:'+id,symbol,'aria-describedby="move-'+id+'"','small-action')}<small id="move-${id}">${description}</small></div>`).join('')}</div>`;
+  }
+
+  function drawWildArena(){
+    const battle=detail.battle;
+    const pet=currentFriend(state,battle.pet);
+    const rival=battle.opponent;
+    const health=(name,role,max,heading='')=>`<div class="wild-health">
+      <span>${role}</span><h2 ${heading}>${name}</h2>
+      <div><progress aria-label="${name} health" max="${max}"></progress><small></small></div>
+      </div>`;
+    overlay.className='wild-arena-overlay';
+    overlay.innerHTML=`<section class="wild-arena-interface" data-panel="wildEncounter" role="dialog" aria-modal="true" aria-labelledby="panel-title">
+      <header class="wild-arena-head">
+        ${health(pet.name,'Your companion',battle.maxHP)}
+        ${health(rival.name,'Wild companion',rival.hp,'id="panel-title"')}
+        <button class="round close" data-action="close" aria-label="Leave battle">${icon('x',21)}</button>
+      </header>
+      <footer class="wild-arena-controls">
+        <div class="wild-arena-status" role="status" aria-atomic="true"><strong></strong><p></p></div>
+        <div class="wild-arena-actions">${battleMoves()}</div>
+      </footer>
+      </section>`;
+    updateWildBattle();
+  }
+
+  function updateWildBattle(playback=wildPlayback){
+    wildPlayback=playback;
+    const {battle}=detail;
+    const bars=overlay.querySelectorAll('.wild-health progress');
+    const values=[playback?.hp??battle.hp,playback?.rivalHP??battle.rivalHP];
+    bars.forEach((bar,i)=>{
+      bar.value=values[i];
+      bar.nextElementSibling.textContent=bar.value+' / '+bar.max+' HP';
+    });
+    const status=overlay.querySelector('.wild-arena-status'), step=playback?.step;
+    const result=playback?null:battle.result;
+    const name=step?.actor==='player'?currentFriend(state,battle.pet).name:battle.opponent.name;
+    const message=step?name+' '+stageMoves[step.move]:
+      result==='won'?'Victory!':result==='lost'?'Your companion is ready to rest':'Turn '+(battle.turn+1)+' · '+rivalCues[rivalMove(battle)];
+    if(status.firstElementChild.textContent!==message) status.firstElementChild.textContent=message;
+    status.lastElementChild.textContent=playback?'':battle.log;
+    const controls=overlay.querySelector('.wild-arena-actions');
+    if(result&&controls.dataset.result!==result){
+      const restoreFocus=controls.contains(document.activeElement);
+      controls.dataset.result=result;
+      controls.innerHTML=(result==='won'?action('Catch '+battle.opponent.name,'wild-catch','paw'):
+        action('Try again','wild-rematch','sword'))+action('Leave','close',null,'','small-action');
+      if(restoreFocus) controls.firstElementChild.focus({preventScroll:true});
+    }
+    for(const button of controls.querySelectorAll('[data-action^="pet-turn:"]')){
+      button.setAttribute('aria-disabled',String(Boolean(playback)));
+    }
   }
 
   function petNursery(){
@@ -693,6 +747,10 @@ export function createUI(root, state, actions, hasSave) {
   }
 
   function showPanel(id, info=null) {
+    const arena=id==='wildEncounter'&&Boolean(info?.battle);
+    root.classList.toggle('wild-arena-mode',arena);
+    hud.inert=arena;
+    if(!arena) wildPlayback=null;
     if(!id) {
       propertyCleanup?.();propertyCleanup=null;
       opened=null; detail=null; overlay.hidden=true; overlay.innerHTML=''; mini=null;
@@ -725,6 +783,11 @@ export function createUI(root, state, actions, hasSave) {
 
   function drawPanel() {
     propertyCleanup?.();propertyCleanup=null;
+    if(opened==='wildEncounter'&&detail.battle){
+      if(overlay.querySelector('.wild-arena-interface')) updateWildBattle();
+      else drawWildArena();
+      return;
+    }
     const oldScroll=overlay.querySelector('.panel-body')?.scrollTop??0;
     const expansionOpen=opened==='homestead'&&overlay.querySelector('.property-expansion')?.open;
     const focused=overlay.contains(document.activeElement)?document.activeElement.dataset.action:null;
@@ -908,7 +971,7 @@ export function createUI(root, state, actions, hasSave) {
     setSaveAvailable(){el('start').firstElementChild.textContent='Continue roaming';},
     importStatus(message,kind){saveMessage=message;saveMessageKind=kind;renderSaveMessage();
       if(!hud.hidden) toast(kind?'Import failed':'Save imported',message,kind?'lock':'cloud-check');},
-    showPanel,refresh,toast,renderBuild,marketPlace:frontier.marketPlace,
+    showPanel,refresh,toast,renderBuild,updateWildBattle,marketPlace:frontier.marketPlace,
     trackingTrail(tracking,source,distance=0,needsFlight=false){
       trackedMapSource=source??null;
       const panel=el('item-trail-status');

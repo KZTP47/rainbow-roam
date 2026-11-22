@@ -109,7 +109,7 @@ export function rivalMove(battle) {
   return moves[battle.turn%moves.length];
 }
 
-export function playPetTurn(state,battle,move) {
+export function playPetTurn(state,battle,move,steps) {
   if(!battle||battle.result||!Object.hasOwn(petMoves,move)) return false;
   const opponent=battle.opponent, intent=rivalMove(battle);
   const incoming=intent==='brace'?0:opponent.damage+(intent==='heavy'?14:0);
@@ -130,6 +130,8 @@ export function playPetTurn(state,battle,move) {
     battle.rivalHP=Math.max(0,battle.rivalHP-damage);
     events.push((counter?'Countered for ':'Landed ')+damage+' damage.');
   }
+  steps?.push({actor:'player',move:counter?'counter':move,guarded:move==='strike'&&intent==='brace',
+    hp:battle.hp,rivalHP:battle.rivalHP});
   if(battle.rivalHP===0){
     battle.result='won';
     if(!battle.wild&&!state.petClub.wins[battle.rival]){
@@ -144,6 +146,7 @@ export function playPetTurn(state,battle,move) {
     if(damage) events.push('Took '+damage+' damage.');
     if(intent==='brace') events.push(opponent.name+' braced.');
     if(!battle.hp) battle.result='lost';
+    steps?.push({actor:'rival',move:intent,guarded:move==='guard',hp:battle.hp,rivalHP:battle.rivalHP});
   }
   battle.turn++;
   battle.log=events.join(' ');

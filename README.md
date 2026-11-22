@@ -32,7 +32,7 @@ Move with **WASD** or the arrow keys, drag to look, and press **E** to interact.
 
 Open **Friends → Evolution chart** to look up every three-stage companion line. Pet, feed, or play with a befriended companion to earn friendship, then choose **Evolve** when you have the listed offering.
 
-Click or tap a nearby wild creature in the overworld, then choose a companion to battle with. Win and select **Catch** to add it to your Friends. Press **E** to offer a treat when the creature’s offering prompt is visible, or **Shift + E** to challenge it.
+Click or tap a nearby wild creature in the overworld, then choose a companion to battle with. The pets face off in a 3D meadow arena with animated moves. Win and select **Catch** to add it to your Friends. Press **E** to offer a treat when the creature’s offering prompt is visible, or **Shift + E** to challenge it.
 
 Open **Friends → Pet battles** for friendly turn-based matches or **Friends → Breed pets** to pair two companions for two Meadow biscuits. Inside a cave, look for the rune seal near the entrance. Solve its clue to open the reward room, then take the stairs and swirling portal to explore the lower floors.
 
